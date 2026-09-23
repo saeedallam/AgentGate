@@ -1,12 +1,21 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+
 import { validateEnvironment } from './infrastructure/config/environment.js';
 import { DatabaseModule } from './infrastructure/database/database.module.js';
 import { HealthController } from './infrastructure/health/health.controller.js';
 import { HealthService } from './infrastructure/health/health.service.js';
+import { OrganizationsModule } from './organizations/organizations.module.js';
 
 @Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true, validate: validateEnvironment }), DatabaseModule],
+  imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+      validate: validateEnvironment,
+    }),
+    DatabaseModule,
+    OrganizationsModule,
+  ],
   controllers: [HealthController],
   providers: [HealthService],
 })
