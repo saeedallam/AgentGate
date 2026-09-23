@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { z } from 'zod';
 
 import { PrismaService } from '../infrastructure/database/prisma.service.js';
@@ -35,4 +35,30 @@ export class OrganizationsService {
       },
     });
   }
+async getForUser(authenticatedUserId: string, organizationId: string) {
+  const organization = await this.prisma.organization.findFirst({
+    where: {
+      id: organizationId,
+      members: {
+        some: {
+          userId: authenticatedUserId,
+        },
+      },
+    },
+    select: {
+      id: true,
+      name: true,
+      createdAt: true,
+    },
+  });
+
+  if (!organization) {
+    throw new NotFoundException('Organization not found');
+  }
+
+  return organization;
 }
+
+}
+
+
