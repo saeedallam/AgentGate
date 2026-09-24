@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 
+import { AuthModule } from './auth/auth.module.js';
 import { validateEnvironment } from './infrastructure/config/environment.js';
 import { DatabaseModule } from './infrastructure/database/database.module.js';
 import { HealthController } from './infrastructure/health/health.controller.js';
@@ -15,6 +16,7 @@ import { OrganizationsModule } from './organizations/organizations.module.js';
     }),
     DatabaseModule,
     OrganizationsModule,
+    AuthModule,
   ],
   controllers: [HealthController],
   providers: [HealthService],
