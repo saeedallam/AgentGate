@@ -59,3 +59,49 @@ test('password hashing supports verification and uses unique salts', async () =>
     false,
   );
 });
+
+const {
+  loginSchema,
+} = require('../dist/auth/dto/login.dto.js');
+
+test('login normalizes email and preserves password exactly', () => {
+  const password = '  My Secret Password  ';
+
+  const result = loginSchema.parse({
+    email: '  USER@Example.com  ',
+    password,
+  });
+
+  assert.equal(result.email, 'user@example.com');
+  assert.equal(result.password, password);
+});
+
+test('login does not enforce the registration minimum length', () => {
+  const input = {
+    email: 'user@example.com',
+    password: 'short',
+  };
+
+  assert.equal(loginSchema.safeParse(input).success, true);
+  assert.equal(registerSchema.safeParse(input).success, false);
+});
+
+test('login rejects invalid input and unexpected fields', () => {
+  const valid = {
+    email: 'user@example.com',
+    password: 'a sufficiently long passphrase',
+  };
+
+  const invalidInputs = [
+    { ...valid, email: 'invalid-email' },
+    { ...valid, password: '' },
+    { ...valid, password: 'x'.repeat(129) },
+    { ...valid, password: 12345 },
+    { ...valid, organizationId: 'untrusted-organization' },
+    { email: valid.email },
+  ];
+
+  for (const input of invalidInputs) {
+    assert.equal(loginSchema.safeParse(input).success, false);
+  }
+});

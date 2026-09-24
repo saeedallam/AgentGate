@@ -2,12 +2,14 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  UnauthorizedException,
 } from '@nestjs/common';
 
 import { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../infrastructure/database/prisma.service.js';
 import { registerSchema } from './dto/register.dto.js';
 import { PasswordService } from './password.service.js';
+import { loginSchema } from './dto/login.dto.js';
 
 @Injectable()
 export class AuthService {
@@ -49,4 +51,43 @@ export class AuthService {
       throw error;
     }
   }
+
+  async validateCredentials(input: unknown) {
+  const result = loginSchema.safeParse(input);
+
+  if (!result.success) {
+    throw new BadRequestException('Invalid login data');
+  }
+
+  const { email, password } = result.data;
+
+  const user = await this.prisma.user.findUnique({
+    where: { email },
+    select: {
+      id: true,
+      email: true,
+      passwordHash: true,
+    },
+  });
+
+  if (!user) {
+    await this.passwords.verifyAgainstDummyHash(password);
+
+    throw new UnauthorizedException('Invalid email or password');
+  }
+
+  const matches = await this.passwords.verify(
+    user.passwordHash,
+    password,
+  );
+
+  if (!matches) {
+    throw new UnauthorizedException('Invalid email or password');
+  }
+
+  return {
+    id: user.id,
+    email: user.email,
+  };
+}
 }

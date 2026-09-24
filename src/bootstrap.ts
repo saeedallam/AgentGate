@@ -15,7 +15,8 @@ export async function createApplication(): Promise<NestFastifyApplication> {
       // Do not log raw URLs, headers, or bodies; URLs may contain secrets.
       serializers: { req: (req: { method: string }) => ({ method: req.method }) },
     },
-  }), { logger: false });
+  }), { logger: false ,  abortOnError: false,
+});
   app.enableShutdownHooks();
   return app;
 }
