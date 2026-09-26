@@ -7,6 +7,7 @@ import { DatabaseModule } from './infrastructure/database/database.module.js';
 import { HealthController } from './infrastructure/health/health.controller.js';
 import { HealthService } from './infrastructure/health/health.service.js';
 import { OrganizationsModule } from './organizations/organizations.module.js';
+import { AgentsModule } from './agents/agents.module.js';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { OrganizationsModule } from './organizations/organizations.module.js';
     DatabaseModule,
     OrganizationsModule,
     AuthModule,
+    AgentsModule
   ],
   controllers: [HealthController],
   providers: [HealthService],
