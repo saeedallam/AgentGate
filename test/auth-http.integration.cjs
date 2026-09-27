@@ -2,7 +2,7 @@ require('reflect-metadata');
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { randomUUID } = require('node:crypto');
+const { randomUUID, randomBytes } = require('node:crypto');
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 
@@ -18,6 +18,7 @@ if (new URL(databaseUrl).pathname !== '/agentgate_test') {
 process.env.DATABASE_URL = databaseUrl;
 process.env.NODE_ENV = 'test';
 process.env.LOG_LEVEL = 'silent';
+process.env.JWT_ACCESS_SECRET = randomBytes(32).toString('hex');
 
 const { createApplication } = require('../dist/bootstrap.js');
 
