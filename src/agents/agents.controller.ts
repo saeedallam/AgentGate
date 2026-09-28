@@ -1,7 +1,11 @@
 import {
   Body,
   Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
   Post,
+  Query,
   Req,
   UnauthorizedException,
   UseGuards,
@@ -17,14 +21,35 @@ export class AgentsController {
   constructor(private readonly agents: AgentsService) {}
 
   @Post()
-  create(
+  create(@Req() request: AuthenticatedRequest, @Body() body: unknown) {
+    return this.agents.createForUser(this.getUserId(request), body);
+  }
+
+  @Get()
+  list(@Req() request: AuthenticatedRequest, @Query() query: unknown) {
+    return this.agents.listForUser(this.getUserId(request), query);
+  }
+
+  @Get(':id')
+  get(
     @Req() request: AuthenticatedRequest,
-    @Body() body: unknown,
+    @Param('id', new ParseUUIDPipe({ version: '4' }))
+    agentId: string,
+    @Query('organizationId', new ParseUUIDPipe({ version: '4' }))
+    organizationId: string
   ) {
+    return this.agents.getForUser(
+      this.getUserId(request),
+      organizationId,
+      agentId
+    );
+  }
+
+  private getUserId(request: AuthenticatedRequest): string {
     if (!request.user) {
       throw new UnauthorizedException('Authentication required');
     }
 
-    return this.agents.createForUser(request.user.id, body);
+    return request.user.id;
   }
 }
