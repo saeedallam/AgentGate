@@ -60,7 +60,23 @@ model Agent {
   createdAt      DateTime    @default(now()) @db.Timestamptz(3)
   updatedAt      DateTime    @updatedAt @db.Timestamptz(3)
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  credentials  AgentCredential[]
 
   @@unique([organizationId, name])
+  @@unique([organizationId, id])
+}
+
+model AgentCredential {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @db.Uuid
+  agentId        String    @db.Uuid
+  keyPrefix      String    @unique @db.VarChar(64)
+  keyHash        String    @db.Text
+  createdAt      DateTime  @default(now()) @db.Timestamptz(3)
+  revokedAt      DateTime? @db.Timestamptz(3)
+
+  agent Agent @relation(fields: [organizationId, agentId], references: [organizationId, id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([organizationId, agentId])
 }
