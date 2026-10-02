@@ -2,6 +2,9 @@ import { z } from 'zod';
 
 export const environmentSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  ACTION_ENVIRONMENT: z.enum(['development', 'staging', 'production']).default('development'),
+  FAKE_EXECUTION_ENABLED: z.enum(['true', 'false']).default('false').transform(value => value === 'true'),
+  FAKE_COMMERCE_SCENARIO: z.enum(['success', 'reject', 'error', 'timeout', 'unknown', 'delayed']).default('success'),
   HOST: z.string().min(1).default('127.0.0.1'),
   PORT: z.coerce.number().int().min(1).max(65535).default(3000),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
@@ -18,3 +21,4 @@ export function validateEnvironment(input: Record<string, unknown>): Environment
   }
   return result.data;
 }
+

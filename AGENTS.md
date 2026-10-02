@@ -15,7 +15,7 @@ MCP is deferred transport/integration, not the product. The core must work witho
 - This is an existing repository. Preserve working code, migrations and identity foundations. Do not scaffold a replacement.
 - Before implementation, inspect AGENTS.md, README.md, package.json, Prisma schema/migrations, relevant src/ and test/ files. Run applicable build/tests/lint where possible and report limitations honestly.
 - Work in small complete slices. Explain the problem, naive approach, its limitations, then the chosen design and implementation. Name patterns only when they genuinely apply.
-- The developer is learning architecture and TypeScript/NestJS. Explain why decisions exist.
+- The developer is learning architecture and TypeScript/NestJS. Before code, show a Mermaid architecture/data-flow diagram, explain the naive approach and why this design was chosen, then explain meaningful syntax and what each test proves. Use small teaching sections in Arabic when conversing with the developer.
 - Keep implemented behavior separate from plans. Update documentation as progress changes.
 - Preserve unrelated working-tree changes. Do not stage unrelated files.
 - Postman is a supplementary manual test client, not a replacement for automated tests.
@@ -98,7 +98,7 @@ Verify existing code/tests and update documentation. Finish credentials, agent a
 
 ### Phase B — Action Core
 Action registry, normalized ActionRequest, execution model, authenticated POST action requests, fake internal executor and persisted execution attempts/results. No advanced policies or real external side effects yet.
-Smallest next slice: ActionRequest and an action registry with validated refund.create input, followed by the execution lifecycle and fake provider.
+Implemented as the refund.create vertical slice; see the current progress and verification sections. Next implementation phase: C.
 
 ### Phase C — Business-aware policies
 Policy/conditions and pure PolicyEngine on ActionRequest. Test argument-based ALLOW, REQUIRE_APPROVAL, DENY and default deny.
@@ -120,16 +120,23 @@ Only after the core is stable. MCP tools/list and tools/call remain adapter conc
 
 ## Current progress and verification boundaries
 
-As of the identity implementation at commit 8b18b03:
-- Nest/Fastify, configuration, health/readiness, Prisma/PostgreSQL and migrations exist.
-- User registration/password hashing, login/JWT, organizations/membership and tenant-scoped agent management exist.
-- Owner-authorized credential issuance, hashed key storage, AgentAuthenticationService and AgentAuthGuard exist.
-- Authentication rejects revoked keys and suspended agents. Administrative suspension/revocation endpoints are not implemented.
-- Guard HTTP behavior is tested with a test-only controller; no product agent action endpoint exists.
-- Action Core, Fake Commerce, policies, executions, approvals, limits, simulation and MCP remain unimplemented.
+Phase B now includes the registry, normalized request factory, execution state machine,
+persisted execution/one dispatch attempt, tenant-owned FakePayment lab, POST /v1/actions
+and GET /v1/executions/:id. The lab is off by default and prohibited in production.
+A per-agent idempotency key prevents redispatch; changed payload returns 409.
+Unknown or unfinished attempts are never automatically retried. The fake provider
+supports success/rejection/delay/ambiguous errors and a lost response after effect.
+Only refund.create is currently registered. This is the first complete vertical slice;
+additional fake actions can follow without blocking Phase C.
+
+Identity, user JWT, organizations/membership, agents and credential issuance/authentication
+remain in place. Suspension/revocation administration endpoints are still deferred.
+Policies, approvals, general retry/reconciliation, stateful budgets, simulation and MCP
+remain future work. See docs/phase-b-guide.md and docs/verification.md for limits.
 
 npm test builds and runs test/*.test.cjs; database *.integration.cjs files require separate execution and a dedicated agentgate_test database with migrations applied. Do not infer integration success from npm test.
 
 The developer reported 22 passing ordinary tests and lint success on 2026-10-01, plus earlier credential/authentication integration success. These reports are not a fresh independent verification of every repository test.
 
 Security test priorities as features arrive: tenant isolation; invalid/revoked/suspended credentials; validated input; default deny and argument decisions; approval mutation/double approval; duplicate requests/refunds; concurrent execution; timeout/retry and unknown outcomes; budget thresholds; observation behavior.
+

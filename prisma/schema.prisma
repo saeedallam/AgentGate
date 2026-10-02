@@ -48,8 +48,9 @@ model Organization {
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
-  members OrganizationMember[]
-  agents  Agent[]
+  members      OrganizationMember[]
+  agents       Agent[]
+  fakePayments FakePayment[]
 }
 
 model OrganizationMember {
@@ -97,9 +98,12 @@ model AgentCredential {
 }
 
 model Execution {
-  id             String @id @default(uuid()) @db.Uuid
-  organizationId String @db.Uuid
-  agentId        String @db.Uuid
+  idempotencyKey String?            @db.VarChar(128)
+  requestHash    String?            @db.VarChar(64)
+  attempts       ExecutionAttempt[]
+  id             String             @id @default(uuid()) @db.Uuid
+  organizationId String             @db.Uuid
+  agentId        String             @db.Uuid
 
   actionName String @db.VarChar(100)
   arguments  Json   @db.JsonB
@@ -119,5 +123,32 @@ model Execution {
 
   agent Agent @relation(fields: [organizationId, agentId], references: [organizationId, id], onDelete: Restrict, onUpdate: Restrict)
 
+  @@unique([organizationId, agentId, idempotencyKey])
+  @@unique([organizationId, id])
   @@index([organizationId, agentId, createdAt])
+}
+
+model ExecutionAttempt {
+  id             String          @id @default(uuid()) @db.Uuid
+  organizationId String          @db.Uuid
+  executionId    String          @unique @db.Uuid
+  credentialId   String          @db.Uuid
+  status         ExecutionStatus @default(EXECUTING)
+  startedAt      DateTime        @default(now()) @db.Timestamptz(3)
+  finishedAt     DateTime?       @db.Timestamptz(3)
+  errorCode      String?         @db.VarChar(100)
+  execution      Execution       @relation(fields: [organizationId, executionId], references: [organizationId, id], onDelete: Restrict, onUpdate: Restrict)
+}
+
+// Test lab only. Seeded by an operator; never created from agent input.
+model FakePayment {
+  organizationId    String       @db.Uuid
+  id                String       @db.VarChar(128)
+  amountMinor       Int
+  currency          String       @default("USD") @db.VarChar(3)
+  refunded          Boolean      @default(false)
+  refundExecutionId String?      @unique @db.Uuid
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@id([organizationId, id])
 }

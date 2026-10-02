@@ -1,0 +1,80 @@
+{
+  "info": {
+    "name": "AgentGate Phase B",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "agentApiKey",
+      "value": ""
+    },
+    {
+      "key": "executionId",
+      "value": ""
+    },
+    {
+      "key": "paymentId",
+      "value": "payment_demo"
+    },
+    {
+      "key": "idempotencyKey",
+      "value": "refund-demo-001"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{agentApiKey}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Submit fake refund",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "{{idempotencyKey}}"
+          }
+        ],
+        "url": "{{baseUrl}}/v1/actions",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"action\": {\n    \"name\": \"refund.create\"\n  },\n  \"arguments\": {\n    \"paymentId\": \"{{paymentId}}\",\n    \"amountMinor\": 5000,\n    \"currency\": \"USD\"\n  }\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (pm.response.code === 200) { pm.collectionVariables.set(\"executionId\", pm.response.json().id); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Read execution",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/v1/executions/{{executionId}}"
+      }
+    }
+  ]
+}

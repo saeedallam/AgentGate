@@ -1,3 +1,4 @@
+import { ActionsModule } from './actions/actions.module.js';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 
@@ -20,9 +21,11 @@ import { OrganizationsModule } from './organizations/organizations.module.js';
     OrganizationsModule,
     AuthModule,
     AgentsModule,
+    ActionsModule,
     AgentCredentialsModule,
   ],
   controllers: [HealthController],
   providers: [HealthService],
 })
 export class AppModule {}
+

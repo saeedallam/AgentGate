@@ -1,6 +1,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
+process.env.JWT_ACCESS_SECRET = require('node:crypto').randomBytes(32).toString('hex');
 process.env.NODE_ENV = 'test';
 process.env.LOG_LEVEL = 'silent';
 process.env.DATABASE_URL = 'postgresql://test:test@127.0.0.1:1/test';
@@ -39,3 +40,4 @@ test('Fastify health endpoints handle database success and failure', async () =>
     await app.close();
   }
 });
+

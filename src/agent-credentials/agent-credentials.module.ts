@@ -17,6 +17,7 @@ import { AgentKeyService } from './agent-key.service.js';
     AgentAuthenticationService,
     AgentAuthGuard,
   ],
-  exports: [AgentAuthGuard],
+  exports: [AgentAuthGuard, AgentAuthenticationService],
 })
 export class AgentCredentialsModule {}
+

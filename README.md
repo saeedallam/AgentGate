@@ -28,9 +28,24 @@ The identity foundation includes:
 - AgentAuthGuard extracts a Bearer key and assigns database-derived agent identity.
 - Unit, HTTP and database integration test files.
 
-The agent HTTP guard test uses a test-only controller. There is no product action-request endpoint yet. Suspension/revocation are enforced when stored state changes; administrative endpoints for those changes are not implemented.
+Phase B now provides a complete fake-only refund flow:
 
-Action registry, normalized ActionRequest, execution records, Fake Commerce, policies, approvals, budgets, simulation and MCP are planned, not implemented.
+- Action registry and normalized ActionRequest factory.
+- Persisted execution lifecycle and a single dispatch attempt per execution.
+- Tenant-owned Fake Commerce payment fixtures and simulated refunds.
+- POST /v1/actions and GET /v1/executions/:id with agent authentication.
+- Per-agent Idempotency-Key matching, atomic claim, duplicate fake refund protection,
+  stable outcomes and no automatic replay of ambiguous/unfinished effects.
+
+The lab is disabled by default and cannot execute in production. Policies,
+approvals, general retry/reconciliation, budgets, simulation and MCP remain planned.
+Administrative suspension/revocation endpoints are not yet implemented.
+
+اقرأ [الشرح المعماري بالعربي وشرح الـsyntax](docs/phase-b-arabic.md).
+
+See [Phase B architecture, syntax and Postman guide](docs/phase-b-guide.md).
+Import [the Postman collection](docs/AgentGate-Phase-B.postman_collection.json)
+and set its local variables. Never export populated secrets.
 
 ## Local setup
 
@@ -86,7 +101,7 @@ node --test test/agent-credentials.integration.cjs test/agent-credentials-http.i
 
 The DATABASE_URL override in that window targets the test database. Use your normal development environment when starting the application. Other integration tests are available under `test/`.
 
-Postman will exercise the existing management routes and, once implemented, the agent action endpoint. It complements automated tests; the test-only guard controller is not available in the running application.
+Postman can exercise the management routes and the implemented /v1/actions endpoint. It complements automated tests.
 
 ## Roadmap
 
@@ -101,10 +116,12 @@ Postman will exercise the existing management routes and, once implemented, the 
 | G — Observe/simulation | Record hypothetical decisions and replay policies against suitable execution history. |
 | H — MCP adapter | Normalize MCP into the stable Action Core. |
 
-The next implementation slice is a normalized ActionRequest and an action registry with validated `refund.create` input. Then introduce the execution lifecycle and fake provider incrementally. Phase B is a fake-only test flow, not authorization to execute real side effects before the safety controls exist.
+The next phase is C: deterministic business-aware policies on normalized ActionRequest.
+Phase B remains a fake-only lab and does not authorize real side effects.
 
 The later refund policy scenario uses USD examples: up to $50 ALLOW; above $50 through $500 REQUIRE_APPROVAL; above $500 DENY. Duplicate refunds, budgets and velocity arrive in their respective phases.
 
 ## Development approach
 
 Preserve the existing modular monolith and migrations. Explain each component's problem and design before implementing a small tested slice. Add modules and abstractions only when needed. See [AGENTS.md](AGENTS.md) for the project constitution and security rules.
+
