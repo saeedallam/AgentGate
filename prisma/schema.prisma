@@ -28,6 +28,20 @@ model User {
   memberships OrganizationMember[]
 }
 
+enum ExecutionStatus {
+  RECEIVED
+  EXECUTING
+  SUCCEEDED
+  FAILED
+  OUTCOME_UNKNOWN
+}
+
+enum ExecutionEnvironment {
+  development
+  staging
+  production
+}
+
 model Organization {
   id        String   @id @default(uuid()) @db.Uuid
   name      String   @db.VarChar(120)
@@ -62,6 +76,7 @@ model Agent {
 
   organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   credentials  AgentCredential[]
+  executions   Execution[]
 
   @@unique([organizationId, name])
   @@unique([organizationId, id])
@@ -79,4 +94,30 @@ model AgentCredential {
   agent Agent @relation(fields: [organizationId, agentId], references: [organizationId, id], onDelete: Restrict, onUpdate: Restrict)
 
   @@index([organizationId, agentId])
+}
+
+model Execution {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  agentId        String @db.Uuid
+
+  actionName String @db.VarChar(100)
+  arguments  Json   @db.JsonB
+
+  resourceType String? @db.VarChar(100)
+  resourceId   String? @db.VarChar(256)
+
+  environment ExecutionEnvironment
+  status      ExecutionStatus      @default(RECEIVED)
+
+  result    Json?   @db.JsonB
+  errorCode String? @db.VarChar(100)
+
+  requestedAt DateTime @db.Timestamptz(3)
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+
+  agent Agent @relation(fields: [organizationId, agentId], references: [organizationId, id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([organizationId, agentId, createdAt])
 }
