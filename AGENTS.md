@@ -98,7 +98,7 @@ Verify existing code/tests and update documentation. Finish credentials, agent a
 
 ### Phase B — Action Core
 Action registry, normalized ActionRequest, execution model, authenticated POST action requests, fake internal executor and persisted execution attempts/results. No advanced policies or real external side effects yet.
-Implemented as the refund.create vertical slice; see the current progress and verification sections. Next implementation phase: C.
+Implemented as the refund.create vertical slice; see the current progress and verification sections. Policy evaluation/gating is implemented in Phase C; next implementation phase: D.
 
 ### Phase C — Business-aware policies
 Policy/conditions and pure PolicyEngine on ActionRequest. Test argument-based ALLOW, REQUIRE_APPROVAL, DENY and default deny.
@@ -131,7 +131,12 @@ additional fake actions can follow without blocking Phase C.
 
 Identity, user JWT, organizations/membership, agents and credential issuance/authentication
 remain in place. Suspension/revocation administration endpoints are still deferred.
-Policies, approvals, general retry/reconciliation, stateful budgets, simulation and MCP
+Phase C adds strict server policy validation, a startup snapshot in POLICY_RULES_JSON,
+tenant-scoped reads, pure evaluation and a pre-claim gate. Unsupported/malformed
+configuration fails startup. DENY and REQUIRE_APPROVAL return 403 without an attempt;
+receipts remain RECEIVED, with no persisted decision or approval record. Existing
+started executions replay without reevaluation. All nodes must use the same snapshot.
+Approval workflows, general retry/reconciliation, stateful budgets, simulation and MCP
 remain future work. See docs/phase-b-guide.md and docs/verification.md for limits.
 
 npm test builds and runs test/*.test.cjs; database *.integration.cjs files require separate execution and a dedicated agentgate_test database with migrations applied. Do not infer integration success from npm test.

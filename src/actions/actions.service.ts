@@ -1,4 +1,6 @@
-import { BadRequestException, Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { PolicyStore } from '../policies/policy-store.js';
+import { PolicyEngine } from '../policies/policy-engine.js';
+import { BadRequestException, ForbiddenException, Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { z, ZodError } from 'zod';
 import type { AuthenticatedAgent } from '../agent-credentials/agent-authentication.service.js';
@@ -14,6 +16,8 @@ export class ActionsService {
     private readonly executions: ExecutionsService,
     private readonly provider: FakeCommerceProvider,
     private readonly config: ConfigService,
+    private readonly policies: PolicyStore,
+    private readonly policyEngine: PolicyEngine,
   ) {}
 
   async submit(identity: AuthenticatedAgent, input: unknown, key: unknown) {
@@ -36,6 +40,25 @@ export class ActionsService {
       throw error;
     }
     const execution = await this.executions.receive(request, keyResult.data);
+    // Replays report recorded outcomes; they never authorize a fresh dispatch.
+    if (execution.status !== 'RECEIVED') return this.executions.get(identity, execution.id);
+    let decision;
+    try {
+      const rules = this.policies.forOrganization(request.organizationId);
+      decision = this.policyEngine.evaluate(request, rules);
+    } catch {
+      throw new ServiceUnavailableException('Policy evaluation unavailable');
+    }
+    if (decision !== 'ALLOW') {
+      throw new ForbiddenException({
+        statusCode: 403,
+        error: 'Forbidden',
+        message: decision === 'REQUIRE_APPROVAL' ? 'Action requires approval' : 'Action denied by policy',
+        code: decision === 'REQUIRE_APPROVAL' ? 'POLICY_APPROVAL_REQUIRED' : 'POLICY_DENIED',
+        decision,
+        executionId: execution.id,
+      });
+    }
     if (!await this.executions.claim(identity, execution.id)) return this.executions.get(identity, execution.id);
     let outcome: ExecutionOutcome;
     try {

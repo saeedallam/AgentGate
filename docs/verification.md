@@ -17,3 +17,22 @@ Limits of this evidence:
 - Real external provider effects, recovery workers, approvals and business policies are outside Phase B.
 
 The earlier execution-model migration and 36 baseline tests had also passed on the developer's Windows/PostgreSQL setup before this change.
+
+## Phase C — 2026-10-08
+
+Base revision: 8682e7e41fe56ebe443e153c73761ce2077198ff.
+
+- 61 ordinary tests passed, including policy HTTP tests with stubbed boundaries
+  and a subprocess proving malformed server policy rejects application startup.
+- TypeScript build and ESLint passed. No migrations/dependency changes.
+- Updated actions-http and execution-model integration suites passed on fresh
+  PGlite after applying the five migration SQL files. Policy-blocked receipts
+  remained RECEIVED, created no attempts, left fake payments untouched and replayed
+  with the same execution ID; changed payload still returned 409.
+- First attempt could not reach a separately launched lab. Co-locating the lab
+  launcher and test subprocess resolved connectivity.
+- As in Phase B, the temporary compiled pool limit was 1; it was restored to 10.
+  Source pool remains 10, and no lab files/dependencies are committed. Native
+  PostgreSQL multi-connection verification remains a user-side follow-up.
+- No live provider, approval workflow, immutable policy-decision history, or
+  dynamic/versioned policy administration is claimed. See phase-c-guide.md.

@@ -1,3 +1,4 @@
+import { PoliciesModule } from './policies/policies.module.js';
 import { ActionsModule } from './actions/actions.module.js';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
@@ -17,6 +18,7 @@ import { OrganizationsModule } from './organizations/organizations.module.js';
       isGlobal: true,
       validate: validateEnvironment,
     }),
+    PoliciesModule,
     DatabaseModule,
     OrganizationsModule,
     AuthModule,

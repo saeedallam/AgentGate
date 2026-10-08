@@ -13,6 +13,14 @@ process.env.JWT_ACCESS_SECRET = randomBytes(32).toString('hex');
 process.env.FAKE_EXECUTION_ENABLED = 'true';
 process.env.ACTION_ENVIRONMENT = 'development';
 process.env.FAKE_COMMERCE_SCENARIO = 'success';
+const orgs = [randomUUID(), randomUUID()];
+process.env.POLICY_RULES_JSON = JSON.stringify(orgs.flatMap(organizationId => [
+  { organizationId, actionName: 'refund.create', effect: 'ALLOW', conditions: [] },
+  ...[['policy_denied', 'DENY'], ['policy_approval', 'REQUIRE_APPROVAL']].map(([value, effect]) => ({
+    organizationId, actionName: 'refund.create', effect,
+    conditions: [{ field: 'arguments.paymentId', operator: 'EQ', value }],
+  })),
+]));
 const { createApplication } = require('../dist/bootstrap.js');
 const { PrismaService } = require('../dist/infrastructure/database/prisma.service.js');
 const { AgentKeyService } = require('../dist/agent-credentials/agent-key.service.js');
@@ -21,7 +29,6 @@ const { ExecutionsService } = require('../dist/executions/executions.service.js'
 
 test('action HTTP flow isolates tenants, claims once and preserves ambiguous effects', async () => {
   const app = await createApplication();
-  const orgs = [randomUUID(), randomUUID()];
   const agents = [randomUUID(), randomUUID(), randomUUID()];
   let failed = false;
   try {
@@ -64,6 +71,26 @@ test('action HTTP flow isolates tenants, claims once and preserves ambiguous eff
     assert.equal((await app.inject({ method: 'POST', url: '/v1/actions',
       headers: { authorization: 'Bearer ' + secrets[0] }, payload: body() })).statusCode, 400);
     assert.equal(await db.execution.count({ where: { organizationId: { in: orgs } } }), 0);
+
+    for (const [paymentId, code] of [
+      ['policy_denied', 'POLICY_DENIED'], ['policy_approval', 'POLICY_APPROVAL_REQUIRED'],
+    ]) {
+      await payment(paymentId);
+      const blocked = await send(body(paymentId), paymentId);
+      assert.equal(blocked.statusCode, 403);
+      assert.equal(blocked.json().code, code);
+      const executionId = blocked.json().executionId;
+      const receipt = await db.execution.findUniqueOrThrow({ where: { id: executionId } });
+      assert.equal(receipt.status, 'RECEIVED');
+      assert.equal(await db.executionAttempt.count({ where: { executionId } }), 0);
+      assert.equal((await db.fakePayment.findUniqueOrThrow({
+        where: { organizationId_id: { organizationId: orgs[0], id: paymentId } },
+      })).refunded, false);
+      const repeated = await send(body(paymentId), paymentId);
+      assert.equal(repeated.statusCode, 403);
+      assert.equal(repeated.json().executionId, executionId);
+      assert.equal((await send(body(paymentId, 4000), paymentId)).statusCode, 409);
+    }
 
     const replies = await Promise.all(Array.from({ length: 6 }, () => send(body(), 'same-request')));
     replies.forEach(r => assert.equal(r.statusCode, 200));

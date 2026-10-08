@@ -37,8 +37,13 @@ Phase B now provides a complete fake-only refund flow:
 - Per-agent Idempotency-Key matching, atomic claim, duplicate fake refund protection,
   stable outcomes and no automatic replay of ambiguous/unfinished effects.
 
-The lab is disabled by default and cannot execute in production. Policies,
-approvals, general retry/reconciliation, budgets, simulation and MCP remain planned.
+Phase C adds validated, tenant-scoped server policies and a pure PolicyEngine.
+DENY overrides REQUIRE_APPROVAL, which overrides ALLOW; no matching grant denies.
+The policy gate runs before claim/provider dispatch. Configure POLICY_RULES_JSON;
+with its default [] new receipts are denied. See [Phase C setup and Postman guide](docs/phase-c-guide.md).
+
+The lab is disabled by default and cannot execute in production. Approval workflows,
+general retry/reconciliation, budgets, simulation and MCP remain planned.
 Administrative suspension/revocation endpoints are not yet implemented.
 
 اقرأ [الشرح المعماري بالعربي وشرح الـsyntax](docs/phase-b-arabic.md).
@@ -116,7 +121,7 @@ Postman can exercise the management routes and the implemented /v1/actions endpo
 | G — Observe/simulation | Record hypothetical decisions and replay policies against suitable execution history. |
 | H — MCP adapter | Normalize MCP into the stable Action Core. |
 
-The next phase is C: deterministic business-aware policies on normalized ActionRequest.
+Phase C policy evaluation and dispatch gating are implemented. The next phase is D: approvals and exact-action integrity.
 Phase B remains a fake-only lab and does not authorize real side effects.
 
 The later refund policy scenario uses USD examples: up to $50 ALLOW; above $50 through $500 REQUIRE_APPROVAL; above $500 DENY. Duplicate refunds, budgets and velocity arrive in their respective phases.

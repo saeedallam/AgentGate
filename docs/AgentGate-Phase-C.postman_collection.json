@@ -1,0 +1,151 @@
+{
+  "info": {
+    "name": "AgentGate Phase C",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Install demo rules for the authenticated agent organization and seed a fresh payment. No credentials included. Approval decisions do not create approval records."
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{agentApiKey}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:3000"
+    },
+    {
+      "key": "agentApiKey",
+      "value": ""
+    },
+    {
+      "key": "paymentId",
+      "value": "payment_policy"
+    },
+    {
+      "key": "runId",
+      "value": "policy-demo-001"
+    }
+  ],
+  "item": [
+    {
+      "name": "Allow 50 USD",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "{{runId}}-allow"
+          }
+        ],
+        "url": "{{baseUrl}}/v1/actions",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"action\": {\n    \"name\": \"refund.create\"\n  },\n  \"arguments\": {\n    \"paymentId\": \"{{paymentId}}\",\n    \"amountMinor\": 5000,\n    \"currency\": \"USD\"\n  }\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"Execution succeeded\", () => pm.expect(pm.response.json().status).to.eql(\"SUCCEEDED\"));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Require approval 50.01 USD",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "{{runId}}-approval"
+          }
+        ],
+        "url": "{{baseUrl}}/v1/actions",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"action\": {\n    \"name\": \"refund.create\"\n  },\n  \"arguments\": {\n    \"paymentId\": \"{{paymentId}}\",\n    \"amountMinor\": 5001,\n    \"currency\": \"USD\"\n  }\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 403\", () => pm.response.to.have.status(403));",
+              "pm.test(\"Policy decision\", () => pm.expect(pm.response.json().code).to.eql(\"POLICY_APPROVAL_REQUIRED\"));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Deny 500.01 USD",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "{{runId}}-deny"
+          }
+        ],
+        "url": "{{baseUrl}}/v1/actions",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"action\": {\n    \"name\": \"refund.create\"\n  },\n  \"arguments\": {\n    \"paymentId\": \"{{paymentId}}\",\n    \"amountMinor\": 50001,\n    \"currency\": \"USD\"\n  }\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 403\", () => pm.response.to.have.status(403));",
+              "pm.test(\"Policy decision\", () => pm.expect(pm.response.json().code).to.eql(\"POLICY_DENIED\"));"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
