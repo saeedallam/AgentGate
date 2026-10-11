@@ -1,6 +1,7 @@
+import { createHash } from 'node:crypto';
 import { PolicyStore } from '../policies/policy-store.js';
 import { PolicyEngine } from '../policies/policy-engine.js';
-import { BadRequestException, ForbiddenException, Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { z, ZodError } from 'zod';
 import type { AuthenticatedAgent } from '../agent-credentials/agent-authentication.service.js';
@@ -39,16 +40,31 @@ export class ActionsService {
       }
       throw error;
     }
-    const execution = await this.executions.receive(request, keyResult.data);
+    const evaluate = () => {
+      try {
+        const rules = this.policies.forOrganization(request.organizationId);
+        const result = this.policyEngine.evaluateDetailed(request, rules);
+        return {
+          policyDecision: result.decision, policyReason: result.reason,
+          policyHash: createHash('sha256').update(JSON.stringify({ version: 1, rules })).digest('hex'),
+          policyEvaluatedAt: new Date(),
+        };
+      } catch {
+        throw new ServiceUnavailableException('Policy evaluation unavailable');
+      }
+    };
+    const execution = await this.executions.receive(request, keyResult.data, evaluate);
     // Replays report recorded outcomes; they never authorize a fresh dispatch.
     if (execution.status !== 'RECEIVED') return this.executions.get(identity, execution.id);
-    let decision;
-    try {
-      const rules = this.policies.forOrganization(request.organizationId);
-      decision = this.policyEngine.evaluate(request, rules);
-    } catch {
-      throw new ServiceUnavailableException('Policy evaluation unavailable');
+    if (!execution.policyDecision || !execution.policyReason || !execution.policyHash || !execution.policyEvaluatedAt) {
+      throw new ConflictException({
+        statusCode: 409, error: 'Conflict', code: 'LEGACY_EXECUTION_REQUIRES_REVIEW',
+        message: 'Original policy decision is unavailable; execution requires review',
+        executionId: execution.id,
+      });
     }
+    // Current rules may restrict an old allowance, but cannot upgrade a saved denial.
+    const decision = execution.policyDecision === 'ALLOW' ? evaluate().policyDecision : execution.policyDecision;
     if (decision !== 'ALLOW') {
       throw new ForbiddenException({
         statusCode: 403,

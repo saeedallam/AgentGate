@@ -172,6 +172,8 @@ test('action HTTP flow isolates tenants, claims once and preserves ambiguous eff
     const pending = await db.execution.create({ data: {
       organizationId: orgs[0], agentId: agents[0], actionName: 'refund.create',
       arguments: body().arguments, environment: 'development', requestedAt: new Date(),
+      requestHash: 'a'.repeat(64), policyDecision: 'ALLOW', policyReason: 'MATCHED_ALLOW',
+      policyHash: 'b'.repeat(64), policyEvaluatedAt: new Date(),
     } });
     assert.equal(await app.get(ExecutionsService).claim({
       organizationId: orgs[0], agentId: agents[0], credentialId: credentials[0].id,

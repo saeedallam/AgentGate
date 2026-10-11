@@ -36,3 +36,14 @@ Base revision: 8682e7e41fe56ebe443e153c73761ce2077198ff.
   PostgreSQL multi-connection verification remains a user-side follow-up.
 - No live provider, approval workflow, immutable policy-decision history, or
   dynamic/versioned policy administration is claimed. See phase-c-guide.md.
+
+
+## 2026-10-11 — Phase C decision persistence correction
+
+The release was tested independently of local Phase D approval code. Prisma
+validation/generation, 65 ordinary tests and lint passed. Three database suites
+(actions HTTP, execution model and policy persistence) passed using all six
+release migrations on fresh PGlite with a temporary compiled-only pool size of 1.
+This verifies stored decisions/replay/legacy blocking and migration compatibility;
+it is not independent-connection native PostgreSQL race verification.
+No Approval model, service, approval migration or Phase D tests are in this release.

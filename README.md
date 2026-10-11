@@ -39,6 +39,9 @@ Phase B now provides a complete fake-only refund flow:
 
 Phase C adds validated, tenant-scoped server policies and a pure PolicyEngine.
 DENY overrides REQUIRE_APPROVAL, which overrides ALLOW; no matching grant denies.
+Initial decisions, reasons, evaluation times and rule fingerprints are persisted.
+Same-key replay cannot upgrade a saved DENY or REQUIRE_APPROVAL; legacy pending
+records without decisions require review. See [decision persistence](docs/policy-persistence.md).
 The policy gate runs before claim/provider dispatch. Configure POLICY_RULES_JSON;
 with its default [] new receipts are denied. See [Phase C setup and Postman guide](docs/phase-c-guide.md).
 
@@ -129,4 +132,5 @@ The later refund policy scenario uses USD examples: up to $50 ALLOW; above $50 t
 ## Development approach
 
 Preserve the existing modular monolith and migrations. Explain each component's problem and design before implementing a small tested slice. Add modules and abstractions only when needed. See [AGENTS.md](AGENTS.md) for the project constitution and security rules.
+
 

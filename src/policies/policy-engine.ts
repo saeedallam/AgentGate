@@ -44,6 +44,10 @@ function matchesCondition(request: ActionRequest, condition: PolicyCondition): b
 
 export class PolicyEngine {
   evaluate(request: ActionRequest, input: unknown): PolicyDecision {
+    return this.evaluateDetailed(request, input).decision;
+  }
+
+  evaluateDetailed(request: ActionRequest, input: unknown): { decision: PolicyDecision; reason: string } {
     const parsed = policiesSchema.safeParse(input);
     if (!parsed.success) throw new InvalidPolicyConfigurationError();
 
@@ -53,9 +57,9 @@ export class PolicyEngine {
       && policy.conditions.every((condition) => matchesCondition(request, condition))
     );
 
-    if (matching.some((policy) => policy.effect === 'DENY')) return 'DENY';
-    if (matching.some((policy) => policy.effect === 'REQUIRE_APPROVAL')) return 'REQUIRE_APPROVAL';
-    if (matching.some((policy) => policy.effect === 'ALLOW')) return 'ALLOW';
-    return 'DENY';
+    if (matching.some((policy) => policy.effect === 'DENY')) return { decision: 'DENY', reason: 'MATCHED_DENY' };
+    if (matching.some((policy) => policy.effect === 'REQUIRE_APPROVAL')) return { decision: 'REQUIRE_APPROVAL', reason: 'MATCHED_APPROVAL' };
+    if (matching.some((policy) => policy.effect === 'ALLOW')) return { decision: 'ALLOW', reason: 'MATCHED_ALLOW' };
+    return { decision: 'DENY', reason: 'NO_MATCHING_ALLOW' };
   }
 }

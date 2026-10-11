@@ -1,9 +1,11 @@
+import { randomUUID } from 'node:crypto';
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import type { AuthenticatedAgent } from '../agent-credentials/agent-authentication.service.js';
 import type { ActionRequest } from '../actions/action-request.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../infrastructure/database/prisma.service.js';
 import { actionJson } from './action-json.js';
+import type { PolicyDecision } from '../policies/policy.js';
 import { transitionExecution } from './execution-state.js';
 
 export type ExecutionOutcome =
@@ -14,27 +16,39 @@ export type ExecutionOutcome =
 export class ExecutionsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async receive(request: ActionRequest, idempotencyKey: string) {
+  async receive(request: ActionRequest, idempotencyKey: string, evaluate: () => {
+    policyDecision: PolicyDecision; policyReason: string; policyHash: string; policyEvaluatedAt: Date;
+  }) {
     const { args, hash } = actionJson(request);
     const scope = { organizationId: request.organizationId, agentId: request.principal.id };
-    try {
-      return await this.prisma.execution.create({ data: {
-        ...scope, idempotencyKey, requestHash: hash,
+    const lookup = () => this.prisma.execution.findFirst({
+      where: { ...scope, idempotencyKey },
+    });
+    const verify = (existing: NonNullable<Awaited<ReturnType<typeof lookup>>>) => {
+      if (existing.requestHash !== hash) throw new ConflictException('Idempotency key already used for a different action');
+      return existing;
+    };
+    const existing = await lookup();
+    if (existing) return verify(existing);
+    // Evaluate only new requests. A unique constraint selects the winner if requests race.
+    const decision = evaluate();
+    return this.prisma.$transaction(async tx => {
+      const id = randomUUID();
+      const inserted = await tx.execution.createMany({ skipDuplicates: true, data: [{
+        id, ...scope, idempotencyKey, requestHash: hash, ...decision,
         actionName: request.action.name, arguments: args,
         resourceType: request.resource?.type ?? null,
         resourceId: request.resource?.id ?? null,
         environment: request.context.environment,
         requestedAt: request.context.requestedAt,
-      } });
-    } catch (error) {
-      if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') throw error;
-      const existing = await this.prisma.execution.findFirst({
-        where: { ...scope, idempotencyKey },
-      });
-      if (!existing) throw error;
-      if (existing.requestHash !== hash) throw new ConflictException('Idempotency key already used for a different action');
-      return existing;
-    }
+      }] });
+      if (inserted.count === 0) {
+        return verify(await tx.execution.findFirstOrThrow({
+          where: { ...scope, idempotencyKey },
+        }));
+      }
+      return tx.execution.findUniqueOrThrow({ where: { id } });
+    });
   }
 
   async claim(identity: AuthenticatedAgent, id: string): Promise<boolean> {
@@ -42,7 +56,7 @@ export class ExecutionsService {
       const changed = await tx.execution.updateMany({
         where: {
           id, organizationId: identity.organizationId, agentId: identity.agentId,
-          status: 'RECEIVED',
+          status: 'RECEIVED', policyDecision: 'ALLOW',
           agent: { status: 'ACTIVE', credentials: { some: {
             id: identity.credentialId, revokedAt: null,
           } } },
@@ -87,6 +101,7 @@ export class ExecutionsService {
         id: true, organizationId: true, agentId: true, actionName: true,
         status: true, result: true, errorCode: true, requestedAt: true,
         createdAt: true, updatedAt: true,
+        policyDecision: true, policyReason: true, policyHash: true, policyEvaluatedAt: true,
         attempts: { select: { id: true, status: true, startedAt: true, finishedAt: true, errorCode: true } },
       },
     });

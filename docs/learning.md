@@ -103,3 +103,15 @@ suites passed on an embedded single-connection lab; native PostgreSQL concurrenc
 verification is pending. Added a no-secret Postman collection and an explicit
 print-only demo-policy generator. See phase-c-guide.md. The learner requested four
 substantial parts instead of per-line questions; do not resume repetitive quizzes.
+
+
+## 2026-10-11 — Original decisions and transactions
+
+Learner's own explanations:
+- Missing historical decision: «المفروض ان احنا منقدرش نجزم قراره الاصلي».
+- Transaction: «وجود الحاجات دي في tx يا ينجحوا كلهم يا يحصل rollback».
+
+Phase C correction saves the request and original policy decision together.
+Legacy pending rows without decision evidence stop for review. Saved denial or
+approval requirement cannot be upgraded by same-key replay after policy changes.
+Approval workflow work remains separate in Phase D.

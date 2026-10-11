@@ -97,13 +97,23 @@ model AgentCredential {
   @@index([organizationId, agentId])
 }
 
+enum PolicyDecision {
+  ALLOW
+  DENY
+  REQUIRE_APPROVAL
+}
+
 model Execution {
-  idempotencyKey String?            @db.VarChar(128)
-  requestHash    String?            @db.VarChar(64)
-  attempts       ExecutionAttempt[]
-  id             String             @id @default(uuid()) @db.Uuid
-  organizationId String             @db.Uuid
-  agentId        String             @db.Uuid
+  policyDecision    PolicyDecision?
+  policyReason      String?            @db.VarChar(100)
+  policyHash        String?            @db.VarChar(64)
+  policyEvaluatedAt DateTime?          @db.Timestamptz(3)
+  idempotencyKey    String?            @db.VarChar(128)
+  requestHash       String?            @db.VarChar(64)
+  attempts          ExecutionAttempt[]
+  id                String             @id @default(uuid()) @db.Uuid
+  organizationId    String             @db.Uuid
+  agentId           String             @db.Uuid
 
   actionName String @db.VarChar(100)
   arguments  Json   @db.JsonB

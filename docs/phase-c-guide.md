@@ -35,21 +35,31 @@ No numeric coercion is performed. Limits: 262144 config characters, 1000 rules,
 
 ## Dispatch gate (part 3)
 
-ActionsService now receives the normalized request first, preserving idempotency
-and changed-payload 409 semantics. A record no longer in RECEIVED is returned as
-stored without policy reevaluation or a new dispatch. For RECEIVED, the service
-selects rules with the trusted request organization and evaluates before claim.
-Only ALLOW reaches the atomic claim and provider. Configuration/evaluation failure
-returns generic 503 and never falls back to execution.
+ActionsService looks up the tenant/agent/idempotency key before initial policy
+evaluation. Changed payload still returns 409. New receipts save the original
+decision, reason, rule snapshot hash and evaluation time with the request in one
+transaction. Concurrent duplicate inserts read the winning record and verify its
+request fingerprint; they never replace its decision.
 
 DENY and REQUIRE_APPROVAL return 403 with code POLICY_DENIED or
 POLICY_APPROVAL_REQUIRED, decision and executionId. Neither creates an attempt.
-The execution remains RECEIVED: no effect was attempted and no approval record
-was created. GET reports that receipt state, not a persisted policy decision.
-A retry is reevaluated against the current startup snapshot; after an operator
-changes policy and restarts, a previously blocked receipt may be allowed. This
-is not human approval, automatic approval, or an immutable authorization record.
-No decision history/version is persisted yet. Those are explicit current limits.
+The execution remains RECEIVED. GET now also reports policyDecision, policyReason,
+policyHash and policyEvaluatedAt. A saved DENY or REQUIRE_APPROVAL cannot become
+ALLOW on same-key replay after a configuration change. No approval record or
+human approval workflow is included in this Phase C correction.
+
+A saved ALLOW must also pass current rules before claim. That safety veto does not
+replace the original decision and is not separately audited yet. Configuration
+or evaluation failures return generic 503, never permission to dispatch.
+Legacy RECEIVED records missing the snapshot return 409 with
+LEGACY_EXECUTION_REQUIRES_REVIEW without evaluation or dispatch. Do not invent
+historical decisions or automatically retry them under new keys. Already started
+or completed executions replay their stored state without reevaluation.
+
+The SHA-256 policy fingerprint covers version 1 and the parsed tenant rules in
+stored array order. It identifies a snapshot; it is not a stored copy or archive
+of policy versions, nor a tamper-proof signature. Full details and update commands:
+[policy-persistence.md](policy-persistence.md).
 
 A snapshot cannot cancel work already claimed. All running instances must use
 the same configuration; rolling configuration changes are not an atomic policy
@@ -139,3 +149,4 @@ immutable decision records and policy revisions require further implementation.
   two committed suites on your PostgreSQL instance; embedded results do not prove
   multi-connection locking behavior. Earlier user-reported Phase B PostgreSQL
   success does not establish verification of this Phase C change.
+

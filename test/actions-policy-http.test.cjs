@@ -31,7 +31,7 @@ test('HTTP policy responses block dispatch and use authenticated organization', 
   try {
     app.get(AgentAuthenticationService).authenticate = async () => identity;
     const executions = app.get(ExecutionsService);
-    executions.receive = async () => { receives++; execution = { id: randomUUID(), status: 'RECEIVED' }; return execution; };
+    executions.receive = async (_request, _key, evaluate) => { receives++; execution = { id: randomUUID(), status: 'RECEIVED', ...evaluate() }; return execution; };
     executions.claim = async () => { claims++; return true; };
     executions.finish = async (_identity, _id, outcome) => ({ ...execution, ...outcome });
     app.get(FakeCommerceProvider).execute = async () => { effects++; return { status: 'SUCCEEDED', result: { simulated: true } }; };

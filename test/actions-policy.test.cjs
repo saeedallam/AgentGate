@@ -12,7 +12,7 @@ function fixture(rules = [], status = 'RECEIVED') {
   const calls = [];
   const execution = { id: 'execution-1', status };
   const executions = {
-    receive: async () => { calls.push('receive'); return execution; },
+    receive: async (_request, _key, evaluate) => { calls.push('receive'); if (status === 'RECEIVED') Object.assign(execution, evaluate()); return execution; },
     get: async () => { calls.push('get'); return execution; },
     claim: async () => { calls.push('claim'); return true; },
     finish: async (_identity, _id, outcome) => { calls.push('finish'); return outcome; },
@@ -45,7 +45,7 @@ test('allow dispatches only after a successful claim', async () => {
 test('started and completed executions replay without policy redispatch', async () => {
   for (const status of ['EXECUTING', 'SUCCEEDED', 'FAILED', 'OUTCOME_UNKNOWN']) {
     const f = fixture([], status);
-    f.engine.evaluate = () => { throw new Error('must not reevaluate past dispatch'); };
+    f.engine.evaluateDetailed = () => { throw new Error('must not reevaluate past dispatch'); };
     assert.equal((await f.service.submit(identity, body, 'key')).status, status);
     assert.deepEqual(f.calls, ['receive', 'get']);
   }
@@ -72,4 +72,31 @@ test('idempotency conflicts remain conflicts before evaluating new permission', 
   f.executions.receive = async () => { throw new ConflictException('Payload changed'); };
   await assert.rejects(f.service.submit(identity, body, 'key'), e => e.getStatus() === 409);
   assert.deepEqual(f.calls, []);
+});
+
+test('legacy RECEIVED without a recorded policy decision requires review without reevaluation', async () => {
+  const f = fixture([rule('ALLOW')]);
+  let evaluations = 0;
+  f.executions.receive = async () => {
+    f.calls.push('receive');
+    return { id: 'legacy-execution', status: 'RECEIVED', policyDecision: null };
+  };
+  f.engine.evaluateDetailed = () => { evaluations++; return 'ALLOW'; };
+
+  await assert.rejects(
+    f.service.submit(identity, body, 'legacy-key'),
+    error => error.getStatus() === 409
+      && error.getResponse().code === 'LEGACY_EXECUTION_REQUIRES_REVIEW',
+  );
+  assert.equal(evaluations, 0);
+  assert.deepEqual(f.calls, ['receive']);
+});
+
+test('current deny blocks a saved allowance without changing its original decision', async () => {
+  const f = fixture([rule('DENY')]);
+  const saved = { id: 'allowed-before', status: 'RECEIVED', policyDecision: 'ALLOW', policyReason: 'MATCHED_ALLOW', policyHash: 'a'.repeat(64), policyEvaluatedAt: new Date() };
+  f.executions.receive = async () => { f.calls.push('receive'); return saved; };
+  await assert.rejects(f.service.submit(identity, body, 'key'), e => e.getResponse().code === 'POLICY_DENIED');
+  assert.equal(saved.policyDecision, 'ALLOW');
+  assert.deepEqual(f.calls, ['receive']);
 });
