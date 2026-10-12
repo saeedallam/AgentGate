@@ -23,7 +23,15 @@ function barrier() {
 }
 function synchronized(db, model, method, rendezvous, pids) {
   return {
-    execution: db.execution,
+    execution: new Proxy(db.execution, { get(target, key) {
+      if (model === 'execution' && key === method) return (...args) => db.$transaction(async tx => {
+        const [row] = await tx.$queryRaw`SELECT pg_backend_pid() AS pid`;
+        pids.add(row.pid);
+        await rendezvous();
+        return tx.execution[method](...args);
+      });
+      const value = target[key]; return typeof value === 'function' ? value.bind(target) : value;
+    } }),
     $transaction: (callback, options) => db.$transaction(async tx => {
       const [row] = await tx.$queryRaw`SELECT pg_backend_pid() AS pid`;
       pids.add(row.pid);
@@ -105,6 +113,31 @@ test('native PostgreSQL resolves competing receipts, owner decisions and claims 
     assert.equal(pids.size, 2); assert.deepEqual(claims.slice().sort(), [false, true]);
     assert.equal(await db.executionAttempt.count({ where: { executionId: approved.id } }), 1);
     assert.equal((await db.execution.findUniqueOrThrow({ where: { id: approved.id } })).status, 'EXECUTING');
+
+    // Denial and claim contend on the same RECEIVED row using independent sessions.
+    for (let i = 0; i < 3; i++) {
+      const receipt = await executions.receive(request, 'denial-claim-' + i, () => snapshot('ALLOW'));
+      gate = barrier(); pids = new Set();
+      services = clients.map(client => new ExecutionsService(synchronized(client, 'execution', 'updateMany', gate, pids)));
+      const evidence = snapshot('REQUIRE_APPROVAL');
+      const [denial, claimed] = await Promise.all([
+        services[0].denyForPolicyTightening(identity, receipt.id, evidence),
+        services[1].claim(identity, receipt.id),
+      ]);
+      assert.equal(pids.size, 2);
+      const final = await db.execution.findUniqueOrThrow({ where: { id: receipt.id } });
+      assert.equal(final.status, claimed ? 'EXECUTING' : 'DENIED');
+      assert.equal(denial.status, final.status);
+      assert.equal(await db.executionAttempt.count({ where: { executionId: receipt.id } }), claimed ? 1 : 0);
+      assert.equal(final.policyDecision, 'ALLOW');
+      if (claimed) {
+        assert.equal(final.blockedAt, null);
+        assert.equal((await executions.denyForPolicyTightening(identity, receipt.id, evidence)).status, 'EXECUTING');
+      } else {
+        assert.equal(final.errorCode, 'POLICY_TIGHTENED');
+        assert.equal(await executions.claim(identity, receipt.id), false);
+      }
+    }
   } finally {
     try {
       await db.$transaction([

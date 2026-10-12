@@ -1,3 +1,4 @@
+import { POLICY_REASON, type PolicyReason } from './policy-reason.js';
 import type { ActionRequest } from '../actions/action-request.js';
 import { policiesSchema } from './policy.js';
 import type { PolicyCondition, PolicyDecision } from './policy.js';
@@ -47,7 +48,7 @@ export class PolicyEngine {
     return this.evaluateDetailed(request, input).decision;
   }
 
-  evaluateDetailed(request: ActionRequest, input: unknown): { decision: PolicyDecision; reason: string } {
+  evaluateDetailed(request: ActionRequest, input: unknown): { decision: PolicyDecision; reason: PolicyReason } {
     const parsed = policiesSchema.safeParse(input);
     if (!parsed.success) throw new InvalidPolicyConfigurationError();
 
@@ -57,9 +58,9 @@ export class PolicyEngine {
       && policy.conditions.every((condition) => matchesCondition(request, condition))
     );
 
-    if (matching.some((policy) => policy.effect === 'DENY')) return { decision: 'DENY', reason: 'MATCHED_DENY' };
-    if (matching.some((policy) => policy.effect === 'REQUIRE_APPROVAL')) return { decision: 'REQUIRE_APPROVAL', reason: 'MATCHED_APPROVAL' };
-    if (matching.some((policy) => policy.effect === 'ALLOW')) return { decision: 'ALLOW', reason: 'MATCHED_ALLOW' };
-    return { decision: 'DENY', reason: 'NO_MATCHING_ALLOW' };
+    if (matching.some((policy) => policy.effect === 'DENY')) return { decision: 'DENY', reason: POLICY_REASON.MATCHED_DENY };
+    if (matching.some((policy) => policy.effect === 'REQUIRE_APPROVAL')) return { decision: 'REQUIRE_APPROVAL', reason: POLICY_REASON.MATCHED_APPROVAL };
+    if (matching.some((policy) => policy.effect === 'ALLOW')) return { decision: 'ALLOW', reason: POLICY_REASON.MATCHED_ALLOW };
+    return { decision: 'DENY', reason: POLICY_REASON.NO_MATCHING_ALLOW };
   }
 }

@@ -1,10 +1,12 @@
 export type ExecutionStatus =
-  'RECEIVED' | 'EXECUTING' | 'SUCCEEDED' | 'FAILED' | 'OUTCOME_UNKNOWN';
+  'DENIED' | 'RECEIVED' | 'EXECUTING' | 'SUCCEEDED' | 'FAILED' | 'OUTCOME_UNKNOWN';
 
 const allowedTransitions: Readonly<
   Record<ExecutionStatus, readonly ExecutionStatus[]>
 > = {
-  RECEIVED: ['EXECUTING'],
+  RECEIVED: ['EXECUTING', 'DENIED'],
+
+  DENIED: [],
 
   EXECUTING: ['SUCCEEDED', 'FAILED', 'OUTCOME_UNKNOWN'],
 

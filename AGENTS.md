@@ -152,3 +152,8 @@ The developer reported 22 passing ordinary tests and lint success on 2026-10-01,
 
 Security test priorities as features arrive: tenant isolation; invalid/revoked/suspended credentials; validated input; default deny and argument decisions; approval mutation/double approval; duplicate requests/refunds; concurrent execution; timeout/retry and unknown outcomes; budget thresholds; observation behavior.
 
+
+Policy tightening follow-up: a pending original ALLOW becomes terminal DENIED when
+a later current evaluation is non-ALLOW. Preserve original policy metadata; persist
+separate blockedPolicyDecision/hash/time and POLICY_TIGHTENED. Never reclassify an
+already claimed execution as denied. See docs/policy-tightening.md.

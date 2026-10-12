@@ -1,7 +1,10 @@
+import type { Execution } from '../generated/prisma/client.js';
+import { BLOCK_CODE } from './action-block-code.js';
+import { blocked } from './action-block.js';
 import { createHash } from 'node:crypto';
 import { PolicyStore } from '../policies/policy-store.js';
 import { PolicyEngine } from '../policies/policy-engine.js';
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { z, ZodError } from 'zod';
 import type { AuthenticatedAgent } from '../agent-credentials/agent-authentication.service.js';
@@ -39,44 +42,29 @@ export class ActionsService {
       }
       throw error;
     }
-    const evaluate = () => {
-      try {
-        const rules = this.policies.forOrganization(request.organizationId);
-        const result = this.policyEngine.evaluateDetailed(request, rules);
-        return {
-          policyDecision: result.decision, policyReason: result.reason,
-          policyHash: createHash('sha256').update(JSON.stringify({ version: 1, rules })).digest('hex'),
-          policyEvaluatedAt: new Date(),
-        };
-      } catch {
-        throw new ServiceUnavailableException('Policy evaluation unavailable');
-      }
-    };
+    const evaluate = () => this.evaluatePolicy(request);
     const execution = await this.executions.receive(request, keyResult.data, evaluate);
     // Replays report recorded outcomes; they never authorize a fresh dispatch.
-    if (execution.status !== 'RECEIVED') return this.executions.get(identity, execution.id);
-    if (!execution.policyDecision || !execution.policyReason || !execution.policyHash || !execution.policyEvaluatedAt) {
-      throw new ConflictException({
-        statusCode: 409, error: 'Conflict', code: 'LEGACY_EXECUTION_REQUIRES_REVIEW',
-        message: 'Original policy decision is unavailable; execution requires review',
-        executionId: execution.id,
-      });
-    }
+    this.assertNotDenied(execution);
+    if (execution.status !== 'RECEIVED') return this.readExecution(identity, execution.id);
+    const savedDecision = this.assertSnapshot(execution);
     // Current rules may restrict an old allowance, but cannot upgrade a saved denial.
-    const decision = execution.policyDecision === 'ALLOW' ? evaluate().policyDecision : execution.policyDecision;
-    if (decision !== 'ALLOW') {
-      throw new ForbiddenException({
-        statusCode: 403,
-        error: 'Forbidden',
-        message: execution.approval?.status === 'APPROVED' ? 'Approval granted; resume the stored execution' : decision === 'REQUIRE_APPROVAL' ? 'Action requires approval' : 'Action denied by policy',
-        code: execution.approval?.status === 'APPROVED' ? 'APPROVAL_READY_TO_RESUME' : decision === 'REQUIRE_APPROVAL' ? 'POLICY_APPROVAL_REQUIRED' : 'POLICY_DENIED',
-        decision,
-        executionId: execution.id,
-        approvalId: execution.approval?.id ?? null,
-        approvalStatus: execution.approval?.status ?? null,
-      });
+    const current = execution.policyDecision === 'ALLOW' ? evaluate() : null;
+    if (current && current.policyDecision !== 'ALLOW') {
+      return this.denyTightened(identity, execution.id, { ...current, policyDecision: current.policyDecision });
     }
-    if (!await this.executions.claim(identity, execution.id)) return this.executions.get(identity, execution.id);
+    const decision = savedDecision;
+    if (decision !== 'ALLOW') {
+      throw blocked(
+        execution.approval?.status === 'APPROVED' ? BLOCK_CODE.APPROVAL_READY_TO_RESUME
+          : decision === 'REQUIRE_APPROVAL' ? BLOCK_CODE.POLICY_APPROVAL_REQUIRED : BLOCK_CODE.POLICY_DENIED,
+        execution.approval?.status === 'APPROVED' ? 'Approval granted; resume the stored execution'
+          : decision === 'REQUIRE_APPROVAL' ? 'Action requires approval' : 'Action denied by policy',
+        { decision, executionId: execution.id,
+          approvalId: execution.approval?.id ?? null, approvalStatus: execution.approval?.status ?? null },
+      );
+    }
+    if (!await this.executions.claim(identity, execution.id)) return this.readExecution(identity, execution.id);
     return this.dispatch(identity, execution.id, request);
   }
 
@@ -87,13 +75,11 @@ export class ActionsService {
     }
     const execution = await this.executions.getStored(identity, id);
     // The single existing attempt is never restarted, including ambiguous outcomes.
-    if (execution.status !== 'RECEIVED') return this.executions.get(identity, id);
-    if (!execution.policyDecision || !execution.policyReason || !execution.policyHash || !execution.policyEvaluatedAt) {
-      throw new ConflictException({ statusCode: 409, error: 'Conflict',
-        code: 'LEGACY_EXECUTION_REQUIRES_REVIEW', message: 'Original policy decision is unavailable', executionId: id });
-    }
+    this.assertNotDenied(execution);
+    if (execution.status !== 'RECEIVED') return this.readExecution(identity, id);
+    this.assertSnapshot(execution);
     if (execution.policyDecision === 'DENY') {
-      throw new ForbiddenException({ statusCode: 403, error: 'Forbidden', code: 'POLICY_DENIED', message: 'Action denied by policy', executionId: id });
+      throw blocked(BLOCK_CODE.POLICY_DENIED, 'Action denied by policy', { executionId: id });
     }
     let binding: { id: string; requestHash: string } | undefined;
     if (execution.policyDecision === 'REQUIRE_APPROVAL') {
@@ -102,10 +88,11 @@ export class ActionsService {
         throw new ConflictException('Approval binding is missing or invalid');
       }
       if (approval.status !== 'APPROVED') {
-        throw new ForbiddenException({ statusCode: 403, error: 'Forbidden',
-          code: approval.status === 'REJECTED' ? 'APPROVAL_REJECTED' : 'POLICY_APPROVAL_REQUIRED',
-          message: approval.status === 'REJECTED' ? 'Approval was rejected' : 'Action requires approval',
-          executionId: id, approvalId: approval.id, approvalStatus: approval.status });
+        throw blocked(
+          approval.status === 'REJECTED' ? BLOCK_CODE.APPROVAL_REJECTED : BLOCK_CODE.POLICY_APPROVAL_REQUIRED,
+          approval.status === 'REJECTED' ? 'Approval was rejected' : 'Action requires approval',
+          { executionId: id, approvalId: approval.id, approvalStatus: approval.status },
+        );
       }
       if (!approval.decidedAt || !approval.decidedByUserId) throw new ConflictException('Approval decision evidence is incomplete');
       binding = { id: approval.id, requestHash: approval.requestHash };
@@ -122,20 +109,61 @@ export class ActionsService {
       if (error instanceof ZodError || error instanceof UnknownActionError) throw new ConflictException('Stored action is no longer supported');
       throw error;
     }
-    let decision;
+    const current = this.evaluatePolicy(request);
+    const decision = current.policyDecision;
+    if (execution.policyDecision === 'ALLOW' && decision !== 'ALLOW') {
+      return this.denyTightened(identity, id, { ...current, policyDecision: decision });
+    }
+    if (decision === 'DENY' || (decision === 'REQUIRE_APPROVAL' && !binding)) {
+      throw blocked(decision === 'DENY' ? BLOCK_CODE.POLICY_DENIED : BLOCK_CODE.POLICY_APPROVAL_REQUIRED,
+        decision === 'DENY' ? 'Action denied by current policy' : 'Current policy requires approval',
+        { decision, executionId: id });
+    }
+    if (!await this.executions.claim(identity, id, binding)) return this.readExecution(identity, id);
+    return this.dispatch(identity, id, request);
+  }
+
+  private assertSnapshot(execution: Pick<Execution,
+    'id' | 'policyDecision' | 'policyReason' | 'policyHash' | 'policyEvaluatedAt'>) {
+    if (!execution.policyDecision || !execution.policyReason || !execution.policyHash || !execution.policyEvaluatedAt) {
+      throw new ConflictException({ statusCode: 409, error: 'Conflict',
+        code: 'LEGACY_EXECUTION_REQUIRES_REVIEW',
+        message: 'Original policy decision is unavailable; execution requires review', executionId: execution.id });
+    }
+    return execution.policyDecision;
+  }
+
+  private assertNotDenied(execution: Pick<Execution, 'id' | 'status'>) {
+    if (execution.status === 'DENIED') {
+      throw blocked(BLOCK_CODE.POLICY_TIGHTENED,
+        'Execution permanently blocked after policy tightening', { executionId: execution.id });
+    }
+  }
+
+  private async readExecution(identity: AuthenticatedAgent, id: string) {
+    const execution = await this.executions.get(identity, id);
+    this.assertNotDenied(execution);
+    return execution;
+  }
+
+  private async denyTightened(identity: AuthenticatedAgent, id: string,
+    evidence: Parameters<ExecutionsService['denyForPolicyTightening']>[2]) {
+    const execution = await this.executions.denyForPolicyTightening(identity, id, evidence);
+    this.assertNotDenied(execution);
+    // Claim may have won before the denial write: return its actual state.
+    return execution;
+  }
+
+  private evaluatePolicy(request: ActionRequest) {
     try {
-      decision = this.policyEngine.evaluate(request, this.policies.forOrganization(request.organizationId));
+      const rules = this.policies.forOrganization(request.organizationId);
+      const result = this.policyEngine.evaluateDetailed(request, rules);
+      return { policyDecision: result.decision, policyReason: result.reason,
+        policyHash: createHash('sha256').update(JSON.stringify({ version: 1, rules })).digest('hex'),
+        policyEvaluatedAt: new Date() };
     } catch {
       throw new ServiceUnavailableException('Policy evaluation unavailable');
     }
-    if (decision === 'DENY' || (decision === 'REQUIRE_APPROVAL' && !binding)) {
-      throw new ForbiddenException({ statusCode: 403, error: 'Forbidden',
-        code: decision === 'DENY' ? 'POLICY_DENIED' : 'POLICY_APPROVAL_REQUIRED',
-        message: decision === 'DENY' ? 'Action denied by current policy' : 'Current policy requires approval',
-        decision, executionId: id });
-    }
-    if (!await this.executions.claim(identity, id, binding)) return this.executions.get(identity, id);
-    return this.dispatch(identity, id, request);
   }
 
   private assertExecutionEnabled() {

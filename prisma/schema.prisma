@@ -30,6 +30,7 @@ model User {
 }
 
 enum ExecutionStatus {
+  DENIED
   RECEIVED
   EXECUTING
   SUCCEEDED
@@ -105,6 +106,9 @@ enum PolicyDecision {
 }
 
 model Execution {
+  blockedPolicyDecision PolicyDecision?
+  blockedPolicyHash String? @db.VarChar(64)
+  blockedAt DateTime? @db.Timestamptz(3)
   policyDecision    PolicyDecision?
   policyReason      String?            @db.VarChar(100)
   policyHash        String?            @db.VarChar(64)

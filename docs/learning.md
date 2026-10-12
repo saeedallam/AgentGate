@@ -298,3 +298,12 @@ The learner will explain the approved-request journey after running the walkthro
 Batch 2 result: native PostgreSQL 17 verification succeeded in GitHub Actions run
 38282172521, including independent-connection receipt/decision/claim races.
 The implementation is published; learner walkthrough and explanation remain to do.
+
+## 2026-10-12 — Policy tightening review
+
+Learner explicitly agreed that a request permanently denied after tightening must
+stay denied under the same key even if rules later return to ALLOW («اه نفذ اللي انت
+شايفه صح و اعرضه عليا بالاكواد»). No additional learner definitions are inferred.
+Teacher explanation: initial policy evidence records the original decision; DENIED
+and blockedPolicy* record a later terminal veto. Claim and denial compete on the
+same RECEIVED row. See policy-tightening.md for implementation and boundaries.

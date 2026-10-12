@@ -1,3 +1,4 @@
+import { BLOCK_CODE } from '../actions/action-block-code.js';
 import { randomUUID } from 'node:crypto';
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import type { AuthenticatedAgent } from '../agent-credentials/agent-authentication.service.js';
@@ -65,6 +66,23 @@ export class ExecutionsService {
     return execution;
   }
 
+  async denyForPolicyTightening(identity: AuthenticatedAgent, id: string, evidence: {
+    policyDecision: Exclude<PolicyDecision, 'ALLOW'>;
+    policyHash: string;
+    policyEvaluatedAt: Date;
+  }) {
+    // Competes with claim on the same row. Never reclassify a started execution.
+    await this.prisma.execution.updateMany({
+      where: { id, organizationId: identity.organizationId, agentId: identity.agentId,
+        status: 'RECEIVED', policyDecision: 'ALLOW' },
+      data: { status: transitionExecution('RECEIVED', 'DENIED'),
+        errorCode: BLOCK_CODE.POLICY_TIGHTENED,
+        blockedPolicyDecision: evidence.policyDecision,
+        blockedPolicyHash: evidence.policyHash, blockedAt: evidence.policyEvaluatedAt },
+    });
+    return this.get(identity, id);
+  }
+
   async claim(identity: AuthenticatedAgent, id: string,
     approval?: { id: string; requestHash: string }): Promise<boolean> {
     return this.prisma.$transaction(async tx => {
@@ -126,6 +144,7 @@ export class ExecutionsService {
         status: true, result: true, errorCode: true, requestedAt: true,
         createdAt: true, updatedAt: true,
         policyDecision: true, policyReason: true, policyHash: true, policyEvaluatedAt: true,
+        blockedPolicyDecision: true, blockedPolicyHash: true, blockedAt: true,
         approval: { select: { id: true, status: true, decidedByUserId: true, decidedAt: true } },
         attempts: { select: { id: true, status: true, startedAt: true, finishedAt: true, errorCode: true } },
       },

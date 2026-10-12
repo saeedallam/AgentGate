@@ -50,3 +50,4 @@ jobs:
           test/approvals-http.integration.cjs
           test/approved-execution.integration.cjs
           test/approval-concurrency.integration.cjs
+          test/policy-tightening.integration.cjs

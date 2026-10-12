@@ -46,6 +46,7 @@ test('unknown outcome can be resolved but cannot restart execution', () => {
 
 test('terminal executions cannot change state', () => {
   const statuses = [
+    'DENIED',
     'RECEIVED',
     'EXECUTING',
     'SUCCEEDED',
@@ -53,7 +54,7 @@ test('terminal executions cannot change state', () => {
     'OUTCOME_UNKNOWN',
   ];
 
-  for (const terminal of ['SUCCEEDED', 'FAILED']) {
+  for (const terminal of ['SUCCEEDED', 'FAILED', 'DENIED']) {
     for (const next of statuses) {
       assert.throws(
         () => transitionExecution(terminal, next),
@@ -91,4 +92,11 @@ test('invalid transition error identifies the attempted transition', () => {
       return true;
     }
   );
+});
+
+test('receipt can be denied but started execution cannot be denied retroactively', () => {
+  assert.equal(transitionExecution('RECEIVED', 'DENIED'), 'DENIED');
+  for (const status of ['EXECUTING', 'SUCCEEDED', 'FAILED', 'OUTCOME_UNKNOWN']) {
+    assert.throws(() => transitionExecution(status, 'DENIED'), InvalidExecutionTransitionError);
+  }
 });

@@ -148,3 +148,9 @@ and import [the Phase D Postman collection](docs/AgentGate-Phase-D.postman_colle
 The backend workflow runs ordinary tests and the Phase C/D database suites against
 PostgreSQL 17. A workflow's existence does not mean its current run passed; inspect
 GitHub Actions or run the native concurrency test locally.
+
+### Policy tightening
+
+Saved ALLOW receipts that have not started become terminal DENIED when current rules
+require approval or deny. Same-key replay cannot revive them after relaxation.
+See [contract, concurrency boundary and migration steps](docs/policy-tightening.md).

@@ -96,7 +96,33 @@ test('current deny blocks a saved allowance without changing its original decisi
   const f = fixture([rule('DENY')]);
   const saved = { id: 'allowed-before', status: 'RECEIVED', policyDecision: 'ALLOW', policyReason: 'MATCHED_ALLOW', policyHash: 'a'.repeat(64), policyEvaluatedAt: new Date() };
   f.executions.receive = async () => { f.calls.push('receive'); return saved; };
-  await assert.rejects(f.service.submit(identity, body, 'key'), e => e.getResponse().code === 'POLICY_DENIED');
+  f.executions.denyForPolicyTightening = async () => { f.calls.push('deny'); return { ...saved, status: 'DENIED' }; };
+  await assert.rejects(f.service.submit(identity, body, 'key'), e => e.getResponse().code === 'POLICY_TIGHTENED');
   assert.equal(saved.policyDecision, 'ALLOW');
-  assert.deepEqual(f.calls, ['receive']);
+  assert.deepEqual(f.calls, ['receive', 'deny']);
+});
+
+test('tightening write failures propagate and cannot reach claim or provider', async () => {
+  const f = fixture([rule('REQUIRE_APPROVAL')]);
+  f.executions.receive = async () => ({ id: 'saved', status: 'RECEIVED', policyDecision: 'ALLOW',
+    policyReason: 'MATCHED_ALLOW', policyHash: 'a'.repeat(64), policyEvaluatedAt: new Date() });
+  const failure = new Error('database unavailable');
+  f.executions.denyForPolicyTightening = async () => { throw failure; };
+  await assert.rejects(f.service.submit(identity, body, 'key'), e => e === failure);
+  assert.deepEqual(f.calls, []);
+});
+
+test('claim losers report permanent denial while a denial loser reports the started execution', async () => {
+  const f = fixture([rule('ALLOW')]);
+  f.executions.claim = async () => false;
+  f.executions.get = async () => ({ id: 'saved', status: 'DENIED' });
+  await assert.rejects(f.service.submit(identity, body, 'key'), e => e.getResponse().code === 'POLICY_TIGHTENED');
+  assert.ok(!f.calls.includes('provider'));
+
+  const tightened = fixture([rule('REQUIRE_APPROVAL')]);
+  tightened.executions.receive = async () => ({ id: 'saved', status: 'RECEIVED', policyDecision: 'ALLOW',
+    policyReason: 'MATCHED_ALLOW', policyHash: 'a'.repeat(64), policyEvaluatedAt: new Date() });
+  tightened.executions.denyForPolicyTightening = async () => ({ id: 'saved', status: 'EXECUTING' });
+  assert.equal((await tightened.service.submit(identity, body, 'key')).status, 'EXECUTING');
+  assert.ok(!tightened.calls.includes('provider'));
 });

@@ -1,0 +1,1 @@
+ALTER TYPE "ExecutionStatus" ADD VALUE 'DENIED';

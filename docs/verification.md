@@ -118,3 +118,13 @@ selected database suites all succeeded. The ninth suite verifies independent
 backend sessions and competing receipt/approval/claim transactions. This supersedes
 the release candidate's pending native-verification note above. It does not claim
 external exactly-once delivery, crash recovery, or a manual Postman run.
+
+## 2026-10-12 — Permanent policy tightening candidate
+
+Observed the new expectation fail against previous code (POLICY_APPROVAL_REQUIRED
+instead of a permanent denial). After implementation, 90 ordinary tests and lint
+passed. The new tightening integration suite and eight existing suites passed on
+fresh PGlite. The backend workflow now includes ten PostgreSQL suites; the native
+concurrency suite additionally races denial against claim using distinct backend
+sessions and a write barrier. Native CI evidence is checked on the release commit.
+No automatic recovery, policy format change or approval reversal is included.
