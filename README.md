@@ -124,7 +124,7 @@ Postman can exercise the management routes and the implemented /v1/actions endpo
 | G — Observe/simulation | Record hypothetical decisions and replay policies against suitable execution history. |
 | H — MCP adapter | Normalize MCP into the stable Action Core. |
 
-Phase C policy evaluation and dispatch gating are implemented. The next phase is D: approvals and exact-action integrity.
+Phase C policy evaluation and dispatch gating are implemented. Phase D adds approvals and exact-action integrity (see below).
 Phase B remains a fake-only lab and does not authorize real side effects.
 
 The later refund policy scenario uses USD examples: up to $50 ALLOW; above $50 through $500 REQUIRE_APPROVAL; above $500 DENY. Duplicate refunds, budgets and velocity arrive in their respective phases.
@@ -134,3 +134,17 @@ The later refund policy scenario uses USD examples: up to $50 ALLOW; above $50 t
 Preserve the existing modular monolith and migrations. Explain each component's problem and design before implementing a small tested slice. Add modules and abstractions only when needed. See [AGENTS.md](AGENTS.md) for the project constitution and security rules.
 
 
+
+## Phase D — Approval workflow
+
+Phase D adds one approval per exact stored request, OWNER decisions using JWT,
+summary-only MEMBER monitoring, database immutability checks, and explicit
+agent-authenticated `POST /v1/executions/:id/resume`. A human decision alone never
+calls the provider. Current DENY still blocks an approved action; started attempts
+are never automatically retried, including OUTCOME_UNKNOWN.
+
+See [approval architecture, limits and Windows verification](docs/phase-d-approvals.md)
+and import [the Phase D Postman collection](docs/AgentGate-Phase-D.postman_collection.json).
+The backend workflow runs ordinary tests and the Phase C/D database suites against
+PostgreSQL 17. A workflow's existence does not mean its current run passed; inspect
+GitHub Actions or run the native concurrency test locally.

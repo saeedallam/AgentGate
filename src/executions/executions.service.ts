@@ -22,7 +22,7 @@ export class ExecutionsService {
     const { args, hash } = actionJson(request);
     const scope = { organizationId: request.organizationId, agentId: request.principal.id };
     const lookup = () => this.prisma.execution.findFirst({
-      where: { ...scope, idempotencyKey },
+      where: { ...scope, idempotencyKey }, include: { approval: true },
     });
     const verify = (existing: NonNullable<Awaited<ReturnType<typeof lookup>>>) => {
       if (existing.requestHash !== hash) throw new ConflictException('Idempotency key already used for a different action');
@@ -44,19 +44,43 @@ export class ExecutionsService {
       }] });
       if (inserted.count === 0) {
         return verify(await tx.execution.findFirstOrThrow({
-          where: { ...scope, idempotencyKey },
+          where: { ...scope, idempotencyKey }, include: { approval: true },
         }));
       }
-      return tx.execution.findUniqueOrThrow({ where: { id } });
+      if (decision.policyDecision === 'REQUIRE_APPROVAL') {
+        await tx.approval.create({ data: {
+          organizationId: scope.organizationId, executionId: id, requestHash: hash,
+        } });
+      }
+      return tx.execution.findUniqueOrThrow({ where: { id }, include: { approval: true } });
     });
   }
 
-  async claim(identity: AuthenticatedAgent, id: string): Promise<boolean> {
+  async getStored(identity: AuthenticatedAgent, id: string) {
+    const execution = await this.prisma.execution.findFirst({
+      where: { id, organizationId: identity.organizationId, agentId: identity.agentId },
+      include: { approval: true },
+    });
+    if (!execution) throw new NotFoundException('Execution not found');
+    return execution;
+  }
+
+  async claim(identity: AuthenticatedAgent, id: string,
+    approval?: { id: string; requestHash: string }): Promise<boolean> {
     return this.prisma.$transaction(async tx => {
       const changed = await tx.execution.updateMany({
         where: {
           id, organizationId: identity.organizationId, agentId: identity.agentId,
-          status: 'RECEIVED', policyDecision: 'ALLOW',
+          status: 'RECEIVED',
+          ...(approval ? {
+            policyDecision: 'REQUIRE_APPROVAL' as const,
+            requestHash: approval.requestHash,
+            approval: { is: {
+              id: approval.id, organizationId: identity.organizationId, executionId: id,
+              requestHash: approval.requestHash, status: 'APPROVED' as const,
+              decidedByUserId: { not: null }, decidedAt: { not: null },
+            } },
+          } : { policyDecision: 'ALLOW' as const, approval: { is: null } }),
           agent: { status: 'ACTIVE', credentials: { some: {
             id: identity.credentialId, revokedAt: null,
           } } },
@@ -102,6 +126,7 @@ export class ExecutionsService {
         status: true, result: true, errorCode: true, requestedAt: true,
         createdAt: true, updatedAt: true,
         policyDecision: true, policyReason: true, policyHash: true, policyEvaluatedAt: true,
+        approval: { select: { id: true, status: true, decidedByUserId: true, decidedAt: true } },
         attempts: { select: { id: true, status: true, startedAt: true, finishedAt: true, errorCode: true } },
       },
     });

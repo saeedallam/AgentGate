@@ -14,7 +14,7 @@ const { actionJson } = require('../dist/executions/action-json.js');
 const databaseUrl = process.env.TEST_DATABASE_URL;
 if (!databaseUrl || new URL(databaseUrl).pathname !== '/agentgate_test') throw new Error('TEST_DATABASE_URL must target agentgate_test');
 
-test('policy snapshots survive replay and legacy requests stay blocked', async () => {
+test('policy snapshots survive replay, approvals are atomic, and legacy requests stay blocked', async () => {
   const db = new PrismaService(new ConfigService({ DATABASE_URL: databaseUrl }));
   const organizationId = randomUUID();
   const identity = { organizationId, agentId: randomUUID(), credentialId: randomUUID() };
@@ -42,11 +42,12 @@ test('policy snapshots survive replay and legacy requests stay blocked', async (
     await assert.rejects(service('ALLOW').submit(identity, { ...body, arguments: { ...body.arguments, amountMinor: 4000 } }, 'denied'), e => e.getStatus() === 409);
 
     await rejects(service('REQUIRE_APPROVAL').submit(identity, body, 'approval'), 'POLICY_APPROVAL_REQUIRED');
-    const pending = await db.execution.findFirstOrThrow({ where: { ...where, idempotencyKey: 'approval' } });
-    assert.equal(pending.policyDecision, 'REQUIRE_APPROVAL');
+    const pending = await db.execution.findFirstOrThrow({ where: { ...where, idempotencyKey: 'approval' }, include: { approval: true } });
+    assert.equal(pending.approval.status, 'PENDING');
+    assert.equal(pending.approval.requestHash, pending.requestHash);
     await rejects(service('ALLOW').submit(identity, body, 'approval'), 'POLICY_APPROVAL_REQUIRED');
-    assert.equal(await db.execution.count({ where: { ...where, idempotencyKey: 'approval' } }), 1);
-    assert.equal((await executions.get(identity, pending.id)).policyDecision, 'REQUIRE_APPROVAL');
+    assert.equal(await db.approval.count({ where }), 1);
+    assert.equal((await executions.get(identity, pending.id)).approval.id, pending.approval.id);
     assert.equal(await executions.claim(identity, denied.id), false);
     assert.equal(await executions.claim(identity, pending.id), false);
 
@@ -55,11 +56,17 @@ test('policy snapshots survive replay and legacy requests stay blocked', async (
       actionName: request.action.name, arguments: args, environment: 'development', requestedAt: new Date() } });
     await rejects(service('ALLOW').submit(identity, body, 'legacy'), 'LEGACY_EXECUTION_REQUIRES_REVIEW');
 
+    const failure = new Error('approval insert failed');
+    const broken = new ExecutionsService({ execution: db.execution, $transaction: callback => db.$transaction(tx => callback({
+      execution: tx.execution, approval: { create: async () => { throw failure; } },
+    })) });
+    await assert.rejects(broken.receive(request, 'rollback', () => ({ policyDecision: 'REQUIRE_APPROVAL', policyReason: 'MATCHED_APPROVAL', policyHash: 'a'.repeat(64), policyEvaluatedAt: new Date() })), e => e === failure);
+    assert.equal(await db.execution.count({ where: { ...where, idempotencyKey: 'rollback' } }), 0);
     assert.equal(await db.executionAttempt.count({ where }), 0);
     assert.equal(effects, 0);
   } finally {
     try {
-      await db.$transaction([db.executionAttempt.deleteMany({ where }),
+      await db.$transaction([db.approval.deleteMany({ where }), db.executionAttempt.deleteMany({ where }),
         db.execution.deleteMany({ where }), db.agent.deleteMany({ where }), db.organization.deleteMany({ where: { id: organizationId } })]);
     } finally { await db.$disconnect(); }
   }

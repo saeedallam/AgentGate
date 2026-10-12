@@ -134,18 +134,21 @@ remain in place. Suspension/revocation administration endpoints are still deferr
 Phase C adds strict server policy validation, a startup snapshot in POLICY_RULES_JSON,
 tenant-scoped reads, pure evaluation and a pre-claim gate. Unsupported/malformed
 configuration fails startup. DENY and REQUIRE_APPROVAL return 403 without an attempt;
-receipts remain RECEIVED with a persisted initial decision, reason, policy snapshot
-hash and evaluation time. Same-key replay never upgrades saved DENY or
-REQUIRE_APPROVAL. Legacy RECEIVED rows without decision evidence stop with 409.
-No approval records/workflow are included yet. Existing started executions replay
-without reevaluation. All nodes must use the same snapshot.
-Approval workflows, general retry/reconciliation, stateful budgets, simulation and MCP
-remain future work. See docs/phase-b-guide.md and docs/verification.md for limits.
+receipts remain RECEIVED, with a saved initial policy decision, reason, snapshot hash
+and evaluation time. REQUIRE_APPROVAL creates a PENDING approval atomically with
+the receipt. Existing started executions replay without reevaluation. Legacy RECEIVED
+rows without decision evidence stop with 409; never backfill inferred permission. All nodes must use the same snapshot.
+Phase D now includes approval monitoring/OWNER decisions via JWT, immutable
+request and approval binding evidence, and explicit agent-authenticated resume from
+the stored request with policy/fingerprint checks and a conditional approved claim.
+Native PostgreSQL decision/claim races are exercised by
+test/approval-concurrency.integration.cjs and the backend verification workflow.
+Consult docs/verification.md for actual run evidence, not inferred results. General retry/reconciliation, budgets, simulation
+and MCP remain future work. See docs/phase-b-guide.md and docs/verification.md for limits.
 
 npm test builds and runs test/*.test.cjs; database *.integration.cjs files require separate execution and a dedicated agentgate_test database with migrations applied. Do not infer integration success from npm test.
 
 The developer reported 22 passing ordinary tests and lint success on 2026-10-01, plus earlier credential/authentication integration success. These reports are not a fresh independent verification of every repository test.
 
 Security test priorities as features arrive: tenant isolation; invalid/revoked/suspended credentials; validated input; default deny and argument decisions; approval mutation/double approval; duplicate requests/refunds; concurrent execution; timeout/retry and unknown outcomes; budget thresholds; observation behavior.
-
 

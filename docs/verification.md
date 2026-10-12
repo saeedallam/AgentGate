@@ -47,3 +47,61 @@ release migrations on fresh PGlite with a temporary compiled-only pool size of 1
 This verifies stored decisions/replay/legacy blocking and migration compatibility;
 it is not independent-connection native PostgreSQL race verification.
 No Approval model, service, approval migration or Phase D tests are in this release.
+
+
+## 2026-10-11 — Local decision-persistence slice
+
+77 ordinary tests and lint passed. The legacy regression was observed failing
+before the fix. Four database integration suites passed on a fresh PGlite instance
+with the complete migration chain and a temporary compiled-only pool limit of one.
+Coverage includes fixed deny replay after policy changes, one pending approval,
+approval-insert rollback, legacy blocking, tenant constraints and HTTP duplicate
+requests. This is not native multi-connection PostgreSQL race verification.
+Approval HTTP workflow and approved dispatch are unfinished; no claim of full Phase D.
+
+## 2026-10-11 — Local execution immutability
+
+The new database regression failed before the trigger and passed afterwards on
+fresh PGlite, testing sixteen protected-field changes, direct SQL, unchanged NULL
+resources and progress/result updates. Lint passed. This does not establish native
+PostgreSQL multi-connection race behavior. The earlier approval-service fingerprint
+regression is still intentionally red pending its implementation; the full local
+Phase D ordinary suite is not claimed green.
+
+## 2026-10-12 — Local approval routes
+
+81 ordinary tests and lint passed. The real JWT/HTTP regression failed before
+route wiring and passed afterwards. Stored-membership HTTP integration passed on
+fresh PGlite with the migration chain and a temporary compiled-only pool size of 1.
+Covers safe MEMBER projections, OWNER detail/decision, tenant 404, role spoofing,
+strict bodies and repeat-decision conflict. No execution attempt is created by a
+decision. Native PostgreSQL concurrent decision/resume testing remains pending.
+
+## 2026-10-12 — Phase D batch 1
+
+87 ordinary tests and lint passed after approved-resume implementation. Eight
+integration suites passed on fresh PGlite using all local migrations and a temporary
+compiled-only pool max of 1: actions-http, approval-binding, approval-model,
+approvals-http, approved-execution, execution-immutability, execution-model and
+policy-persistence. This includes concurrent HTTP resumes but not independent
+native PostgreSQL connections. No publication or native concurrency claim yet.
+New approval INSERT/UPDATE constraints and trigger were verified failing the
+mutation regression before migration and passing after it. Trigger migrations
+remain essential; Prisma schema generation alone does not install these guards.
+
+## 2026-10-12 — Phase D release candidate
+
+Fresh verification: 87 ordinary tests passed; lint passed. Eight integration suites
+passed on fresh PGlite after all nine migrations, with the temporary compiled-only
+single-connection pool restored afterwards. No changes to installed dependencies.
+
+Added approval-concurrency.integration.cjs for native independent PostgreSQL sessions:
+competing receipt decisions, duplicate pending approvals, competing OWNER decisions
+and competing claims. It checks distinct pg_backend_pid() values and aligns writes
+with a barrier. This test has not yet run locally: no native PostgreSQL server or
+Docker executable is available in this execution environment. The new backend
+workflow provisions PostgreSQL 17 and runs it plus the eight existing database
+suites. CI results must be checked separately; presence of the workflow is not a pass.
+
+The Postman collection was structurally checked; no manual Postman run is claimed.
+Earlier notes above describe historical slices and their then-current limitations.

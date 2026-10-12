@@ -20,8 +20,8 @@ loser reads the winner and verifies the request fingerprint. The initial lookup
 alone does not provide concurrency protection.
 
 GET returns the original decision metadata. Status RECEIVED describes execution
-progress, not policy permission. No approval table, approval endpoints or approved
-execution workflow is part of this release; those belong to Phase D.
+progress, not policy permission. Phase D adds an approval record in the receipt transaction and an explicit
+approved-resume workflow; see [Phase D](phase-d-approvals.md).
 
 PolicyHash uses SHA-256 over version 1 and the parsed tenant rule array in stored
 order. It is a snapshot identifier, not an archived ruleset or tamper-proof record.

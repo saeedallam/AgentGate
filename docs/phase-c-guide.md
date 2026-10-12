@@ -150,3 +150,9 @@ immutable decision records and policy revisions require further implementation.
   multi-connection locking behavior. Earlier user-reported Phase B PostgreSQL
   success does not establish verification of this Phase C change.
 
+
+## Phase D continuation
+
+REQUIRE_APPROVAL now creates a bound PENDING approval. Human decisions and explicit
+agent resume are documented in [Phase D](phase-d-approvals.md). POST replay alone
+does not execute approved work. Initial decisions still cannot be upgraded.

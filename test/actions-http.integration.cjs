@@ -184,7 +184,7 @@ test('action HTTP flow isolates tenants, claims once and preserves ambiguous eff
       const db = app.get(PrismaService);
       const where = { organizationId: { in: orgs } };
       await db.$transaction([
-        db.executionAttempt.deleteMany({ where }), db.execution.deleteMany({ where }),
+        db.approval.deleteMany({ where }), db.executionAttempt.deleteMany({ where }), db.execution.deleteMany({ where }),
         db.fakePayment.deleteMany({ where }), db.agentCredential.deleteMany({ where }),
         db.agent.deleteMany({ where }), db.organization.deleteMany({ where: { id: { in: orgs } } }),
       ]);

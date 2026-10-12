@@ -25,7 +25,8 @@ model User {
   createdAt    DateTime @default(now()) @db.Timestamptz(3)
   updatedAt    DateTime @updatedAt @db.Timestamptz(3)
 
-  memberships OrganizationMember[]
+  memberships       OrganizationMember[]
+  approvalDecisions Approval[]
 }
 
 enum ExecutionStatus {
@@ -111,6 +112,7 @@ model Execution {
   idempotencyKey    String?            @db.VarChar(128)
   requestHash       String?            @db.VarChar(64)
   attempts          ExecutionAttempt[]
+  approval          Approval?
   id                String             @id @default(uuid()) @db.Uuid
   organizationId    String             @db.Uuid
   agentId           String             @db.Uuid
@@ -161,4 +163,29 @@ model FakePayment {
   organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
 
   @@id([organizationId, id])
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Approval {
+  id              String         @id @default(uuid()) @db.Uuid
+  organizationId  String         @db.Uuid
+  executionId     String         @unique @db.Uuid
+  requestHash     String         @db.VarChar(64)
+  status          ApprovalStatus @default(PENDING)
+  decidedByUserId String?        @db.Uuid
+  decidedAt       DateTime?      @db.Timestamptz(3)
+  createdAt       DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime       @updatedAt @db.Timestamptz(3)
+
+  execution Execution @relation(fields: [organizationId, executionId], references: [organizationId, id], onDelete: Restrict, onUpdate: Restrict)
+  decidedBy User?     @relation(fields: [decidedByUserId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([organizationId, executionId])
+  @@index([organizationId, status, createdAt])
+  @@index([decidedByUserId])
 }

@@ -1,3 +1,4 @@
+import { ApprovalsModule } from './approvals/approvals.module.js';
 import { PoliciesModule } from './policies/policies.module.js';
 import { ActionsModule } from './actions/actions.module.js';
 import { Module } from '@nestjs/common';
@@ -19,6 +20,7 @@ import { OrganizationsModule } from './organizations/organizations.module.js';
       validate: validateEnvironment,
     }),
     PoliciesModule,
+    ApprovalsModule,
     DatabaseModule,
     OrganizationsModule,
     AuthModule,

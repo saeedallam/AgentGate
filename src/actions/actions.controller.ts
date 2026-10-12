@@ -18,6 +18,15 @@ export class ActionsController {
     return this.actions.submit(request.agent, body, key);
   }
 
+  @Post('executions/:id/resume')
+  @HttpCode(200)
+  @Header('Cache-Control', 'no-store')
+  resume(@Req() request: AgentAuthenticatedRequest,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string, @Body() body: unknown) {
+    if (!request.agent) throw new UnauthorizedException('Authentication required');
+    return this.actions.resume(request.agent, id, body);
+  }
+
   @Get('executions/:id')
   @Header('Cache-Control', 'no-store')
   get(@Req() request: AgentAuthenticatedRequest, @Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {

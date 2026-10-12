@@ -1,0 +1,578 @@
+{
+  "info": {
+    "name": "AgentGate Phase D \u2014 Approvals",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Run numbered requests once in order with a fresh seeded payment and demo approval policy. Set collection variables; see docs/phase-d-approvals.md. Credentials intentionally empty. Optional MEMBER folder needs a real member JWT."
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:3000"
+    },
+    {
+      "key": "organizationId",
+      "value": ""
+    },
+    {
+      "key": "agentApiKey",
+      "value": ""
+    },
+    {
+      "key": "ownerAccessToken",
+      "value": ""
+    },
+    {
+      "key": "memberAccessToken",
+      "value": ""
+    },
+    {
+      "key": "paymentId",
+      "value": "payment_approval_demo"
+    },
+    {
+      "key": "runId",
+      "value": "approval-demo-001"
+    },
+    {
+      "key": "executionId",
+      "value": ""
+    },
+    {
+      "key": "approvalId",
+      "value": ""
+    },
+    {
+      "key": "attemptId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "1 \u2014 Request 100 USD refund (save IDs)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "{{runId}}-approval"
+          }
+        ],
+        "url": "{{baseUrl}}/v1/actions",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{agentApiKey}}",
+              "type": "string"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"action\": {\n    \"name\": \"refund.create\"\n  },\n  \"arguments\": {\n    \"paymentId\": \"{{paymentId}}\",\n    \"amountMinor\": 10000,\n    \"currency\": \"USD\"\n  }\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 403\", () => pm.response.to.have.status(403));",
+              "const data = pm.response.json();",
+              "pm.test(\"Pending approval created\", () => { pm.expect(data.code).to.eql(\"POLICY_APPROVAL_REQUIRED\"); pm.expect(data.approvalId).to.be.a(\"string\"); pm.expect(data.approvalStatus).to.eql(\"PENDING\"); });",
+              "if (pm.response.code === 403 && data.approvalId && data.executionId) { pm.collectionVariables.set(\"approvalId\", data.approvalId); pm.collectionVariables.set(\"executionId\", data.executionId); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2 \u2014 Replay returns same approval",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "{{runId}}-approval"
+          }
+        ],
+        "url": "{{baseUrl}}/v1/actions",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{agentApiKey}}",
+              "type": "string"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"action\": {\n    \"name\": \"refund.create\"\n  },\n  \"arguments\": {\n    \"paymentId\": \"{{paymentId}}\",\n    \"amountMinor\": 10000,\n    \"currency\": \"USD\"\n  }\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 403\", () => pm.response.to.have.status(403));",
+              "pm.test(\"Same approval and execution\", () => { const d = pm.response.json(); pm.expect(d.approvalId).to.eql(pm.collectionVariables.get(\"approvalId\")); pm.expect(d.executionId).to.eql(pm.collectionVariables.get(\"executionId\")); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3 \u2014 Pending cannot resume",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/v1/executions/{{executionId}}/resume",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{agentApiKey}}",
+              "type": "string"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 403\", () => pm.response.to.have.status(403));",
+              "pm.test(\"Still pending\", () => pm.expect(pm.response.json().code).to.eql(\"POLICY_APPROVAL_REQUIRED\"));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4 \u2014 OWNER reviews exact stored action",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/v1/approvals/{{approvalId}}",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{ownerAccessToken}}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"Exact amount\", () => pm.expect(pm.response.json().request.arguments.amountMinor).to.eql(10000));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5 \u2014 OWNER approves",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/v1/approvals/{{approvalId}}/decision",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{ownerAccessToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"decision\": \"APPROVED\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"Approved\", () => pm.expect(pm.response.json().status).to.eql(\"APPROVED\"));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "6 \u2014 Decision alone creates no attempt",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/v1/executions/{{executionId}}",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{agentApiKey}}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"No dispatch yet\", () => { const d=pm.response.json(); pm.expect(d.status).to.eql(\"RECEIVED\"); pm.expect(d.attempts).to.have.lengthOf(0); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "7 \u2014 Cannot reverse final decision",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/v1/approvals/{{approvalId}}/decision",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{ownerAccessToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"decision\": \"REJECTED\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 409\", () => pm.response.to.have.status(409));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "8 \u2014 Original agent resumes stored action",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/v1/executions/{{executionId}}/resume",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{agentApiKey}}",
+              "type": "string"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"One successful attempt\", () => { const d=pm.response.json(); pm.expect(d.status).to.eql(\"SUCCEEDED\"); pm.expect(d.result.amountMinor).to.eql(10000); pm.expect(d.attempts).to.have.lengthOf(1); pm.collectionVariables.set(\"attemptId\",d.attempts[0].id); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "9 \u2014 Resume replay does not dispatch again",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/v1/executions/{{executionId}}/resume",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{agentApiKey}}",
+              "type": "string"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"Same attempt\", () => { const d=pm.response.json(); pm.expect(d.status).to.eql(\"SUCCEEDED\"); pm.expect(d.attempts).to.have.lengthOf(1); pm.expect(d.attempts[0].id).to.eql(pm.collectionVariables.get(\"attemptId\")); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10 \u2014 Resume rejects replacement payload",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/v1/executions/{{executionId}}/resume",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{agentApiKey}}",
+              "type": "string"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"amountMinor\": 40000\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Optional \u2014 MEMBER monitoring (requires a MEMBER token)",
+      "item": [
+        {
+          "name": "List organization summaries",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/v1/approvals?organizationId={{organizationId}}&limit=20&offset=0",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{memberAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Detail exposes only seven monitoring fields",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/v1/approvals/{{approvalId}}",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{memberAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Summary only\", () => pm.expect(Object.keys(pm.response.json()).sort()).to.eql([\"id\",\"executionId\",\"status\",\"executionStatus\",\"actionName\",\"createdAt\",\"decidedAt\"].sort()));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "MEMBER cannot decide",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/approvals/{{approvalId}}/decision",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{memberAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"decision\": \"APPROVED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 403\", () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
