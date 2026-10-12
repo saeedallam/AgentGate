@@ -105,3 +105,16 @@ suites. CI results must be checked separately; presence of the workflow is not a
 
 The Postman collection was structurally checked; no manual Postman run is claimed.
 Earlier notes above describe historical slices and their then-current limitations.
+
+## Native PostgreSQL verification — 2026-10-12
+
+GitHub Actions run 38282172521 passed for code commit
+43f8a9a31a8174674cad2cffebd0404fedb5ef28:
+https://github.com/saeedallam/AgentGate/actions/runs/38282172521
+
+The run used Node 24 and a fresh PostgreSQL 17 service. Dependency installation,
+Prisma validation/generation, all migrations, ordinary tests, lint and the nine
+selected database suites all succeeded. The ninth suite verifies independent
+backend sessions and competing receipt/approval/claim transactions. This supersedes
+the release candidate's pending native-verification note above. It does not claim
+external exactly-once delivery, crash recovery, or a manual Postman run.

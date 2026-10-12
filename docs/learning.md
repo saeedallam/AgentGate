@@ -294,3 +294,7 @@ Terms for the next review (teacher definitions, not yet explained by the learner
 
 The earlier explanation remains central: «وجود الحاجات دي في tx يا ينجحوا كلهم يا يحصل rollback».
 The learner will explain the approved-request journey after running the walkthrough.
+
+Batch 2 result: native PostgreSQL 17 verification succeeded in GitHub Actions run
+38282172521, including independent-connection receipt/decision/claim races.
+The implementation is published; learner walkthrough and explanation remain to do.
