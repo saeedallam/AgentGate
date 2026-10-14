@@ -1,0 +1,282 @@
+{
+  "info": {
+    "name": "AgentGate Phase E \u2014 Safe recovery",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Use dedicated seeded payments and unique runId for each new scenario. Read docs/phase-e-safe-execution.md. NOT_FOUND is not proof of no effect. Keep secrets local."
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:3000"
+    },
+    {
+      "key": "organizationId",
+      "value": ""
+    },
+    {
+      "key": "agentApiKey",
+      "value": ""
+    },
+    {
+      "key": "ownerAccessToken",
+      "value": ""
+    },
+    {
+      "key": "executionId",
+      "value": ""
+    },
+    {
+      "key": "paymentId",
+      "value": "payment_recovery_01"
+    },
+    {
+      "key": "runId",
+      "value": "recovery-01"
+    }
+  ],
+  "item": [
+    {
+      "name": "1 \u2014 Submit a new recovery demo",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Idempotency-Key",
+            "value": "{{runId}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{agentApiKey}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/v1/actions",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "v1",
+            "actions"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"action\": {\n    \"name\": \"refund.create\"\n  },\n  \"arguments\": {\n    \"paymentId\": \"{{paymentId}}\",\n    \"amountMinor\": 1000,\n    \"currency\": \"USD\"\n  }\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const r = pm.response.json();",
+              "if (r.id) pm.collectionVariables.set(\"executionId\", r.id);",
+              "pm.test(\"execution exists\", () => pm.expect(r.id).to.be.a(\"string\"));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2 \u2014 Reconcile without dispatch",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{agentApiKey}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/v1/executions/{{executionId}}/reconcile",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "v1",
+            "executions",
+            "{{executionId}}",
+            "reconcile"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "3 \u2014 Explicit bounded retry (after nextRetryAt)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{agentApiKey}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/v1/executions/{{executionId}}/retry",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "v1",
+            "executions",
+            "{{executionId}}",
+            "retry"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "4 \u2014 Owner observes after agent suspension",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{ownerAccessToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/v1/organizations/{{organizationId}}/executions/{{executionId}}/reconcile",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "v1",
+            "organizations",
+            "{{organizationId}}",
+            "executions",
+            "{{executionId}}",
+            "reconcile"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "5 \u2014 Reject replacement payload",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{agentApiKey}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/v1/executions/{{executionId}}/retry",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "v1",
+            "executions",
+            "{{executionId}}",
+            "retry"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"amountMinor\": 40000\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"payload rejected\", () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

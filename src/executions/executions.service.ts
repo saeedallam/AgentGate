@@ -1,4 +1,6 @@
 import { BLOCK_CODE } from '../actions/action-block-code.js';
+import { EXECUTION_LEASE_MS, retryDelayMs, retryWindow } from './recovery-contract.js';
+import type { ConfirmedOutcome } from '../providers/action-provider.js';
 import { randomUUID } from 'node:crypto';
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import type { AuthenticatedAgent } from '../agent-credentials/agent-authentication.service.js';
@@ -7,7 +9,7 @@ import { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../infrastructure/database/prisma.service.js';
 import { actionJson } from './action-json.js';
 import type { PolicyDecision } from '../policies/policy.js';
-import { transitionExecution } from './execution-state.js';
+import { retryExecution, transitionExecution } from './execution-state.js';
 
 export type ExecutionOutcome =
   | { status: 'SUCCEEDED'; result: Prisma.InputJsonObject }
@@ -36,7 +38,7 @@ export class ExecutionsService {
     return this.prisma.$transaction(async tx => {
       const id = randomUUID();
       const inserted = await tx.execution.createMany({ skipDuplicates: true, data: [{
-        id, ...scope, idempotencyKey, requestHash: hash, ...decision,
+        id, ...scope, idempotencyKey, requestHash: hash, recoveryVersion: 1, ...decision,
         actionName: request.action.name, arguments: args,
         resourceType: request.resource?.type ?? null,
         resourceId: request.resource?.id ?? null,
@@ -83,44 +85,119 @@ export class ExecutionsService {
     return this.get(identity, id);
   }
 
+  private authorization(identity: AuthenticatedAgent,
+    approval?: { id: string; requestHash: string }): Prisma.ExecutionWhereInput {
+    return {
+      organizationId: identity.organizationId, agentId: identity.agentId,
+      ...(approval ? {
+        policyDecision: 'REQUIRE_APPROVAL', requestHash: approval.requestHash,
+        approval: { is: { id: approval.id, organizationId: identity.organizationId,
+          requestHash: approval.requestHash, status: 'APPROVED',
+          decidedByUserId: { not: null }, decidedAt: { not: null } } },
+      } : { policyDecision: 'ALLOW', approval: { is: null } }),
+      agent: { status: 'ACTIVE', credentials: { some: { id: identity.credentialId, revokedAt: null } } },
+    };
+  }
+
   async claim(identity: AuthenticatedAgent, id: string,
-    approval?: { id: string; requestHash: string }): Promise<boolean> {
+    approval?: { id: string; requestHash: string }, attemptId: string = randomUUID()): Promise<boolean> {
     return this.prisma.$transaction(async tx => {
       const changed = await tx.execution.updateMany({
-        where: {
-          id, organizationId: identity.organizationId, agentId: identity.agentId,
-          status: 'RECEIVED',
-          ...(approval ? {
-            policyDecision: 'REQUIRE_APPROVAL' as const,
-            requestHash: approval.requestHash,
-            approval: { is: {
-              id: approval.id, organizationId: identity.organizationId, executionId: id,
-              requestHash: approval.requestHash, status: 'APPROVED' as const,
-              decidedByUserId: { not: null }, decidedAt: { not: null },
-            } },
-          } : { policyDecision: 'ALLOW' as const, approval: { is: null } }),
-          agent: { status: 'ACTIVE', credentials: { some: {
-            id: identity.credentialId, revokedAt: null,
-          } } },
-        },
-        data: { status: transitionExecution('RECEIVED', 'EXECUTING') },
+        where: { id, ...this.authorization(identity, approval), status: 'RECEIVED' },
+        data: { status: transitionExecution('RECEIVED', 'EXECUTING'), attemptCount: { increment: 1 },
+          leaseExpiresAt: new Date(Date.now() + EXECUTION_LEASE_MS), nextRetryAt: null },
       });
       if (changed.count === 0) return false;
       await tx.executionAttempt.create({ data: {
-        organizationId: identity.organizationId, executionId: id,
-        credentialId: identity.credentialId,
+        id: attemptId, organizationId: identity.organizationId, executionId: id,
+        credentialId: identity.credentialId, attemptNumber: 1,
       } });
       return true;
     });
   }
 
-  async finish(identity: AuthenticatedAgent, id: string, outcome: ExecutionOutcome) {
-    const status = transitionExecution('EXECUTING', outcome.status);
+  async claimRetry(identity: AuthenticatedAgent, id: string, expectedAttemptCount: number,
+    attemptId: string, approval?: { id: string; requestHash: string }): Promise<boolean> {
+    return this.prisma.$transaction(async tx => {
+      await tx.$queryRaw`SELECT id FROM "Execution" WHERE id = ${id}::uuid
+        AND "organizationId" = ${identity.organizationId}::uuid AND "agentId" = ${identity.agentId}::uuid FOR UPDATE`;
+      const execution = await tx.execution.findFirst({ where: { id, ...this.authorization(identity, approval) } });
+      if (!execution) throw new ConflictException('Execution is no longer authorized for retry');
+      if (execution.attemptCount !== expectedAttemptCount) return false;
+      const reason = retryWindow(execution, new Date());
+      if (reason) throw new ConflictException({ statusCode: 409, error: 'Conflict', code: reason, message: 'Execution cannot be retried now' });
+      const next = execution.attemptCount + 1;
+      if (execution.status === 'EXECUTING') {
+        const old = await tx.executionAttempt.updateMany({
+          where: { executionId: id, attemptNumber: execution.attemptCount, status: 'EXECUTING' },
+          data: { status: 'OUTCOME_UNKNOWN', errorCode: 'ATTEMPT_LEASE_EXPIRED', finishedAt: new Date() },
+        });
+        if (old.count !== 1) throw new ConflictException('Execution attempt missing');
+      }
+      await tx.execution.update({ where: { id }, data: {
+        status: retryExecution(execution.status), attemptCount: next, errorCode: null,
+        leaseExpiresAt: new Date(Date.now() + EXECUTION_LEASE_MS), nextRetryAt: null,
+      } });
+      await tx.executionAttempt.create({ data: {
+        id: attemptId, organizationId: identity.organizationId, executionId: id,
+        credentialId: identity.credentialId, attemptNumber: next,
+      } });
+      return true;
+    });
+  }
+
+  async expireLease(identity: AuthenticatedAgent, id: string) {
     await this.prisma.$transaction(async tx => {
       const changed = await tx.execution.updateMany({
-        where: { id, organizationId: identity.organizationId, agentId: identity.agentId, status: 'EXECUTING' },
+        where: { id, organizationId: identity.organizationId, agentId: identity.agentId,
+          recoveryVersion: 1, status: 'EXECUTING', leaseExpiresAt: { lte: new Date() } },
+        data: { status: transitionExecution('EXECUTING', 'OUTCOME_UNKNOWN'), errorCode: 'ATTEMPT_LEASE_EXPIRED',
+          leaseExpiresAt: null, nextRetryAt: new Date(Date.now() + retryDelayMs(3)) },
+      });
+      if (changed.count === 0) return;
+      const attempt = await tx.executionAttempt.updateMany({ where: { executionId: id, status: 'EXECUTING' },
+        data: { status: 'OUTCOME_UNKNOWN', errorCode: 'ATTEMPT_LEASE_EXPIRED', finishedAt: new Date() } });
+      if (attempt.count !== 1) throw new ConflictException('Execution attempt missing');
+    });
+    return this.get(identity, id);
+  }
+
+  async reconcile(identity: AuthenticatedAgent, id: string, outcome: ConfirmedOutcome) {
+    await this.prisma.$transaction(async tx => {
+      await tx.$queryRaw`SELECT id FROM "Execution" WHERE id = ${id}::uuid
+        AND "organizationId" = ${identity.organizationId}::uuid AND "agentId" = ${identity.agentId}::uuid FOR UPDATE`;
+      const execution = await tx.execution.findFirst({ where: { id, organizationId: identity.organizationId, agentId: identity.agentId } });
+      if (!execution) throw new NotFoundException('Execution not found');
+      if (!['EXECUTING', 'OUTCOME_UNKNOWN'].includes(execution.status)) return;
+      if (execution.recoveryVersion !== 1) throw new ConflictException('Legacy recovery requires manual review');
+      const attempts = await tx.executionAttempt.count({ where: { executionId: id } });
+      if (attempts !== execution.attemptCount || attempts === 0) throw new ConflictException('Execution attempt evidence incomplete');
+      const now = new Date();
+      await tx.executionAttempt.updateMany({ where: { executionId: id, status: 'EXECUTING' },
+        data: { status: 'OUTCOME_UNKNOWN', errorCode: 'RECOVERED_PROVIDER_RECEIPT', finishedAt: now } });
+      await tx.executionAttempt.updateMany({ where: { executionId: id, status: 'OUTCOME_UNKNOWN', resolvedAt: null },
+        data: { resolvedAt: now, resolvedStatus: outcome.status } });
+      await tx.execution.update({ where: { id }, data: {
+        status: transitionExecution(execution.status, outcome.status), leaseExpiresAt: null, nextRetryAt: null,
+        ...(outcome.status === 'SUCCEEDED' ? { result: outcome.result, errorCode: null } : { errorCode: outcome.errorCode }),
+      } });
+    });
+    return this.get(identity, id);
+  }
+
+  async finish(identity: AuthenticatedAgent, id: string, outcome: ExecutionOutcome, attemptId?: string) {
+    const status = transitionExecution('EXECUTING', outcome.status);
+    await this.prisma.$transaction(async tx => {
+      const attemptRecord = await tx.executionAttempt.findFirst({ where: {
+        executionId: id, organizationId: identity.organizationId,
+        ...(attemptId ? { id: attemptId } : { attemptNumber: 1 }),
+      } });
+      if (!attemptRecord) throw new ConflictException('Execution attempt missing');
+      const changed = await tx.execution.updateMany({
+        where: { id, organizationId: identity.organizationId, agentId: identity.agentId, status: 'EXECUTING', attemptCount: attemptRecord.attemptNumber },
         data: {
-          status,
+          status, leaseExpiresAt: null,
+          nextRetryAt: outcome.status === 'OUTCOME_UNKNOWN' ? new Date(Date.now() + retryDelayMs(attemptRecord.attemptNumber)) : null,
           ...(outcome.status === 'SUCCEEDED'
             ? { result: outcome.result, errorCode: null }
             : { errorCode: outcome.errorCode }),
@@ -128,10 +205,14 @@ export class ExecutionsService {
       });
       if (changed.count !== 1) throw new ConflictException('Execution state changed');
       const attempt = await tx.executionAttempt.updateMany({
-        where: { executionId: id, organizationId: identity.organizationId, status: 'EXECUTING' },
+        where: { id: attemptRecord.id, executionId: id, organizationId: identity.organizationId, status: 'EXECUTING' },
         data: { status, finishedAt: new Date(), errorCode: outcome.status === 'SUCCEEDED' ? null : outcome.errorCode },
       });
       if (attempt.count !== 1) throw new ConflictException('Execution attempt missing');
+      if (outcome.status !== 'OUTCOME_UNKNOWN') {
+        await tx.executionAttempt.updateMany({ where: { executionId: id, status: 'OUTCOME_UNKNOWN', resolvedAt: null },
+          data: { resolvedAt: new Date(), resolvedStatus: outcome.status } });
+      }
     });
     return this.get(identity, id);
   }
@@ -142,11 +223,12 @@ export class ExecutionsService {
       select: {
         id: true, organizationId: true, agentId: true, actionName: true,
         status: true, result: true, errorCode: true, requestedAt: true,
+        recoveryVersion: true, attemptCount: true, leaseExpiresAt: true, nextRetryAt: true,
         createdAt: true, updatedAt: true,
         policyDecision: true, policyReason: true, policyHash: true, policyEvaluatedAt: true,
         blockedPolicyDecision: true, blockedPolicyHash: true, blockedAt: true,
         approval: { select: { id: true, status: true, decidedByUserId: true, decidedAt: true } },
-        attempts: { select: { id: true, status: true, startedAt: true, finishedAt: true, errorCode: true } },
+        attempts: { orderBy: { attemptNumber: 'asc' }, select: { id: true, attemptNumber: true, status: true, startedAt: true, finishedAt: true, errorCode: true, resolvedAt: true, resolvedStatus: true } },
       },
     });
     if (!execution) throw new NotFoundException('Execution not found');

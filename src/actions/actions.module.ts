@@ -1,3 +1,5 @@
+import { AuthModule } from '../auth/auth.module.js';
+import { RecoveryMonitoringController } from './recovery-monitoring.controller.js';
 import { PoliciesModule } from '../policies/policies.module.js';
 import { Module } from '@nestjs/common';
 import { AgentCredentialsModule } from '../agent-credentials/agent-credentials.module.js';
@@ -8,8 +10,8 @@ import { ActionsController } from './actions.controller.js';
 import { ActionsService } from './actions.service.js';
 
 @Module({
-  imports: [DatabaseModule, AgentCredentialsModule, PoliciesModule],
-  controllers: [ActionsController],
+  imports: [AuthModule, DatabaseModule, AgentCredentialsModule, PoliciesModule],
+  controllers: [ActionsController, RecoveryMonitoringController],
   providers: [ExecutionsService, FakeCommerceProvider, ActionsService],
 })
 export class ActionsModule {}

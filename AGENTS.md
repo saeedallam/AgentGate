@@ -157,3 +157,16 @@ Policy tightening follow-up: a pending original ALLOW becomes terminal DENIED wh
 a later current evaluation is non-ALLOW. Preserve original policy metadata; persist
 separate blockedPolicyDecision/hash/time and POLICY_TIGHTENED. Never reclassify an
 already claimed execution as denied. See docs/policy-tightening.md.
+
+
+## Phase E implementation update (2026-10-14)
+
+This supersedes earlier single-attempt/future-reconciliation progress notes above.
+New executions use recoveryVersion=1, durable fake-provider receipts, explicit
+reconcile/retry routes, up to three numbered attempts, lease/backoff and fenced
+completion. Ordinary submit/resume replay still never redispatches ambiguous work.
+Retries preserve execution/provider operation key and recheck policy, binding and
+active credentials. No automatic scheduler or real provider guarantee. Historical
+version-0 rows remain manual-review only. OWNER reconciliation can observe an
+existing effect after agent/key disablement without retry authority. See
+`docs/phase-e-safe-execution.md`; run native recovery races separately from npm test.

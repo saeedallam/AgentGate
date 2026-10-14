@@ -27,6 +27,24 @@ export class ActionsController {
     return this.actions.resume(request.agent, id, body);
   }
 
+  @Post('executions/:id/reconcile')
+  @HttpCode(200)
+  @Header('Cache-Control', 'no-store')
+  reconcile(@Req() request: AgentAuthenticatedRequest,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string, @Body() body: unknown) {
+    if (!request.agent) throw new UnauthorizedException('Authentication required');
+    return this.actions.reconcile(request.agent, id, body);
+  }
+
+  @Post('executions/:id/retry')
+  @HttpCode(200)
+  @Header('Cache-Control', 'no-store')
+  retry(@Req() request: AgentAuthenticatedRequest,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string, @Body() body: unknown) {
+    if (!request.agent) throw new UnauthorizedException('Authentication required');
+    return this.actions.retry(request.agent, id, body);
+  }
+
   @Get('executions/:id')
   @Header('Cache-Control', 'no-store')
   get(@Req() request: AgentAuthenticatedRequest, @Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {

@@ -307,3 +307,20 @@ stay denied under the same key even if rules later return to ALLOW («اه نف�
 Teacher explanation: initial policy evidence records the original decision; DENIED
 and blockedPolicy* record a later terminal veto. Claim and denial compete on the
 same RECEIVED row. See policy-tightening.md for implementation and boundaries.
+
+
+## Phase E — implementation notes, learner definitions pending
+
+These are instructor explanations, not attributed learner definitions. The learner
+requested implementation followed by a detailed code walkthrough; no new answers
+have yet been supplied for this phase.
+
+- Reconciliation: ask the provider for evidence about an existing operation; no dispatch.
+- Stable operation key: same execution ID across all attempts.
+- Lease: bounded claim interval; expiry does not prove the old worker stopped.
+- Fencing: only the current attempt can complete the execution.
+- Backoff: wait before another permitted dispatch; three attempts maximum here.
+- Durable receipt: provider-owned result committed atomically with the fake effect.
+
+Exercise to answer in the learner's own words: why is NOT_FOUND insufficient to
+prove absence, and why must a retry preserve the provider operation key?

@@ -39,3 +39,12 @@ export function transitionExecution(
 
   return next;
 }
+
+// Separate from ordinary lifecycle transitions: only the guarded recovery claim
+// may dispatch another attempt. UNKNOWN never returns to RECEIVED.
+export function retryExecution(current: ExecutionStatus): ExecutionStatus {
+  if (current !== 'EXECUTING' && current !== 'OUTCOME_UNKNOWN') {
+    throw new InvalidExecutionTransitionError(current, 'EXECUTING');
+  }
+  return 'EXECUTING';
+}

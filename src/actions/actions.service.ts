@@ -1,10 +1,12 @@
 import type { Execution } from '../generated/prisma/client.js';
 import { BLOCK_CODE } from './action-block-code.js';
 import { blocked } from './action-block.js';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { PolicyStore } from '../policies/policy-store.js';
 import { PolicyEngine } from '../policies/policy-engine.js';
-import { BadRequestException, ConflictException, Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { retryWindow } from '../executions/recovery-contract.js';
+import type { ActionProvider } from '../providers/action-provider.js';
+import { Inject, BadRequestException, ConflictException, Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { z, ZodError } from 'zod';
 import type { AuthenticatedAgent } from '../agent-credentials/agent-authentication.service.js';
@@ -21,7 +23,7 @@ import type { ActionEnvironment } from './action-request.js';
 export class ActionsService {
   constructor(
     private readonly executions: ExecutionsService,
-    private readonly provider: FakeCommerceProvider,
+    @Inject(FakeCommerceProvider) private readonly provider: ActionProvider,
     private readonly config: ConfigService,
     private readonly policies: PolicyStore,
     private readonly policyEngine: PolicyEngine,
@@ -64,19 +66,63 @@ export class ActionsService {
           approvalId: execution.approval?.id ?? null, approvalStatus: execution.approval?.status ?? null },
       );
     }
-    if (!await this.executions.claim(identity, execution.id)) return this.readExecution(identity, execution.id);
-    return this.dispatch(identity, execution.id, request);
+    const attemptId = randomUUID();
+    if (!await this.executions.claim(identity, execution.id, undefined, attemptId)) return this.readExecution(identity, execution.id);
+    return this.dispatch(identity, execution.id, request, attemptId);
   }
 
   async resume(identity: AuthenticatedAgent, id: string, input: unknown) {
+    return this.startStored(identity, id, input, false);
+  }
+
+  async retry(identity: AuthenticatedAgent, id: string, input: unknown) {
+    return this.startStored(identity, id, input, true);
+  }
+
+  async reconcile(identity: AuthenticatedAgent, id: string, input: unknown) {
+    this.assertExecutionEnabled();
+    this.assertRecoveryInput(id, input);
+    const execution = await this.executions.getStored(identity, id);
+    if (!['EXECUTING', 'OUTCOME_UNKNOWN'].includes(execution.status)) return this.executions.get(identity, id);
+    this.assertRecoveryContract(execution);
+    const request = verifiedActionRequest(execution, execution.approval?.requestHash ?? execution.requestHash ?? '');
+    if (request.context.environment !== this.config.get('ACTION_ENVIRONMENT', 'development')) throw new ConflictException('Stored action belongs to a different environment');
+    // Observation is permitted even when current policy denies further dispatch.
+    const observed = await this.provider.lookup(id, request);
+    if (observed.status === 'FOUND') return this.executions.reconcile(identity, id, observed.outcome);
+    return { ...await this.executions.expireLease(identity, id), reconciliation: { status: 'NOT_FOUND', retrySafeFromAbsence: false } };
+  }
+
+  private assertRecoveryInput(id: string, input: unknown) {
+    if (!z.uuid().safeParse(id).success || !z.strictObject({}).safeParse(input === undefined ? {} : input).success) {
+      throw new BadRequestException('Recovery accepts an execution id and no action payload');
+    }
+  }
+
+  private assertRecoveryContract(execution: Pick<Execution, 'recoveryVersion'>) {
+    if (execution.recoveryVersion !== 1 || this.provider.recoveryVersion !== 1) {
+      throw new ConflictException({ statusCode: 409, error: 'Conflict', code: 'LEGACY_RECOVERY_UNSUPPORTED', message: 'Durable provider recovery contract is unavailable' });
+    }
+  }
+
+  private async startStored(identity: AuthenticatedAgent, id: string, input: unknown, retry: boolean) {
     this.assertExecutionEnabled();
     if (!z.uuid().safeParse(id).success || !z.strictObject({}).safeParse(input === undefined ? {} : input).success) {
       throw new BadRequestException('Resume accepts an execution id and no action payload');
     }
     const execution = await this.executions.getStored(identity, id);
-    // The single existing attempt is never restarted, including ambiguous outcomes.
     this.assertNotDenied(execution);
-    if (execution.status !== 'RECEIVED') return this.readExecution(identity, id);
+    if (!retry && execution.status !== 'RECEIVED') return this.readExecution(identity, id);
+    if (retry) {
+      if (['SUCCEEDED', 'FAILED'].includes(execution.status)) return this.readExecution(identity, id);
+      this.assertRecoveryContract(execution);
+      const storedRequest = verifiedActionRequest(execution, execution.approval?.requestHash ?? execution.requestHash ?? '');
+      if (storedRequest.context.environment !== this.config.get('ACTION_ENVIRONMENT', 'development')) throw new ConflictException('Stored action belongs to a different environment');
+      const observed = await this.provider.lookup(id, storedRequest);
+      if (observed.status === 'FOUND') return this.executions.reconcile(identity, id, observed.outcome);
+      const reason = retryWindow(execution, new Date());
+      if (reason) throw new ConflictException({ statusCode: 409, error: 'Conflict', code: reason, message: 'Execution cannot be retried now' });
+    }
     this.assertSnapshot(execution);
     if (execution.policyDecision === 'DENY') {
       throw blocked(BLOCK_CODE.POLICY_DENIED, 'Action denied by policy', { executionId: id });
@@ -111,7 +157,7 @@ export class ActionsService {
     }
     const current = this.evaluatePolicy(request);
     const decision = current.policyDecision;
-    if (execution.policyDecision === 'ALLOW' && decision !== 'ALLOW') {
+    if (!retry && execution.policyDecision === 'ALLOW' && decision !== 'ALLOW') {
       return this.denyTightened(identity, id, { ...current, policyDecision: decision });
     }
     if (decision === 'DENY' || (decision === 'REQUIRE_APPROVAL' && !binding)) {
@@ -119,8 +165,12 @@ export class ActionsService {
         decision === 'DENY' ? 'Action denied by current policy' : 'Current policy requires approval',
         { decision, executionId: id });
     }
-    if (!await this.executions.claim(identity, id, binding)) return this.readExecution(identity, id);
-    return this.dispatch(identity, id, request);
+    const attemptId = randomUUID();
+    const claimed = retry
+      ? await this.executions.claimRetry(identity, id, execution.attemptCount, attemptId, binding)
+      : await this.executions.claim(identity, id, binding, attemptId);
+    if (!claimed) return this.readExecution(identity, id);
+    return this.dispatch(identity, id, request, attemptId);
   }
 
   private assertSnapshot(execution: Pick<Execution,
@@ -174,7 +224,7 @@ export class ActionsService {
     }
   }
 
-  private async dispatch(identity: AuthenticatedAgent, id: string, request: ActionRequest) {
+  private async dispatch(identity: AuthenticatedAgent, id: string, request: ActionRequest, attemptId: string) {
     let outcome: ExecutionOutcome;
     try {
       outcome = await this.provider.execute(id, request);
@@ -183,6 +233,6 @@ export class ActionsService {
       outcome = { status: 'OUTCOME_UNKNOWN', errorCode: 'PROVIDER_OUTCOME_UNKNOWN' };
     }
     // Persistence failures propagate as server errors. Never dispatch again.
-    return this.executions.finish(identity, id, outcome);
+    return this.executions.finish(identity, id, outcome, attemptId);
   }
 }

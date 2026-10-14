@@ -128,3 +128,18 @@ fresh PGlite. The backend workflow now includes ten PostgreSQL suites; the nativ
 concurrency suite additionally races denial against claim using distinct backend
 sessions and a write barrier. Native CI evidence is checked on the release commit.
 No automatic recovery, policy format change or approval reversal is included.
+
+## Phase E local verification — 2026-10-14
+
+- `npm test`: 91 passing ordinary tests (including recovery eligibility).
+- `npm run lint`: passed.
+- Fresh embedded PostgreSQL/PGlite database: all 12 migrations applied; 10 integration
+  suites passed, including HTTP recovery, durable receipts, lost replies, retries,
+  stale completion, owner observation after suspension, legacy rejection and forced
+  rollback between effect and receipt finalization. Older C/D suites remained green.
+- Embedded verification is NOT evidence for independent native backend sessions.
+  CI explicitly runs `approval-concurrency.integration.cjs` and
+  `recovery-concurrency.integration.cjs` on native PostgreSQL 17. Consult that run's
+  result before claiming the native races passed.
+- Recovery eligibility test was introduced failing (module absent), then implemented.
+- No production database, real payment provider or populated user secrets were used.

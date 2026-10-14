@@ -51,3 +51,5 @@ jobs:
           test/approved-execution.integration.cjs
           test/approval-concurrency.integration.cjs
           test/policy-tightening.integration.cjs
+          test/execution-recovery.integration.cjs
+          test/recovery-concurrency.integration.cjs

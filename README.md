@@ -31,7 +31,7 @@ The identity foundation includes:
 Phase B now provides a complete fake-only refund flow:
 
 - Action registry and normalized ActionRequest factory.
-- Persisted execution lifecycle and a single dispatch attempt per execution.
+- Persisted execution lifecycle; Phase E adds bounded numbered recovery attempts.
 - Tenant-owned Fake Commerce payment fixtures and simulated refunds.
 - POST /v1/actions and GET /v1/executions/:id with agent authentication.
 - Per-agent Idempotency-Key matching, atomic claim, duplicate fake refund protection,
@@ -45,8 +45,8 @@ records without decisions require review. See [decision persistence](docs/policy
 The policy gate runs before claim/provider dispatch. Configure POLICY_RULES_JSON;
 with its default [] new receipts are denied. See [Phase C setup and Postman guide](docs/phase-c-guide.md).
 
-The lab is disabled by default and cannot execute in production. Approval workflows,
-general retry/reconciliation, budgets, simulation and MCP remain planned.
+The lab is disabled by default and cannot execute in production. Approvals and explicit
+fake-provider recovery are implemented; budgets, simulation and MCP remain planned.
 Administrative suspension/revocation endpoints are not yet implemented.
 
 اقرأ [الشرح المعماري بالعربي وشرح الـsyntax](docs/phase-b-arabic.md).
@@ -154,3 +154,13 @@ GitHub Actions or run the native concurrency test locally.
 Saved ALLOW receipts that have not started become terminal DENIED when current rules
 require approval or deny. Same-key replay cannot revive them after relaxation.
 See [contract, concurrency boundary and migration steps](docs/policy-tightening.md).
+
+## Phase E — Safe recovery
+
+Explicit `/v1/executions/:id/reconcile` and `/retry` preserve the operation key,
+use durable fake-provider receipts and fence stale attempt completions. New
+executions have at most three attempts; old executions are not silently upgraded.
+OWNER-only reconciliation remains available when an agent is suspended. No
+background retry worker or real provider is introduced.
+See [contract, architecture, Windows steps and limits](docs/phase-e-safe-execution.md)
+and [Postman collection](docs/AgentGate-Phase-E.postman_collection.json).
