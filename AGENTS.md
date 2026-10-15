@@ -170,3 +170,16 @@ active credentials. No automatic scheduler or real provider guarantee. Historica
 version-0 rows remain manual-review only. OWNER reconciliation can observe an
 existing effect after agent/key disablement without retry authority. See
 `docs/phase-e-safe-execution.md`; run native recovery races separately from npm test.
+
+## Phase F implementation update (2026-10-15)
+
+The initial stateful slice is a daily USD refund budget, explicitly configured by
+REFUND_BUDGETS_JSON for organization/environment scopes. Reserve atomically with
+claim; settle with confirmed outcomes; retain unknown holds and reuse the same
+reservation on retries, including across midnight. Scope is first-dispatch UTC day,
+not settlement date. Initial policy evidence remains unchanged; budget admission is
+a separate live gate. Old unbudgeted history is not silently assigned a balance.
+All nodes must use the same config/version when enabling enforcement. Existing
+daily caps are immutable. No velocity system, kill-switch administration, automatic
+scheduler, generic rules framework, simulation or MCP was added. See
+`docs/phase-f-daily-refund-budget.md` and the native concurrency suite.

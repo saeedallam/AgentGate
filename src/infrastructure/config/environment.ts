@@ -1,3 +1,4 @@
+import { parseRefundBudgets } from '../../budgets/refund-budget-config.js';
 import { z } from 'zod';
 
 export const environmentSchema = z.object({
@@ -5,6 +6,7 @@ export const environmentSchema = z.object({
   ACTION_ENVIRONMENT: z.enum(['development', 'staging', 'production']).default('development'),
   FAKE_EXECUTION_ENABLED: z.enum(['true', 'false']).default('false').transform(value => value === 'true'),
   FAKE_COMMERCE_SCENARIO: z.enum(['success', 'reject', 'error', 'timeout', 'unknown', 'delayed']).default('success'),
+  REFUND_BUDGETS_JSON: z.string().max(262144).default('[]'),
   POLICY_RULES_JSON: z.string().max(262144).default('[]'),
   HOST: z.string().min(1).default('127.0.0.1'),
   PORT: z.coerce.number().int().min(1).max(65535).default(3000),
@@ -20,6 +22,7 @@ export function validateEnvironment(input: Record<string, unknown>): Environment
     // Never echo values: a malformed URL can contain a database password.
     throw new Error(`Invalid configuration: ${result.error.issues.map((issue) => issue.path.join('.')).join(', ')}`);
   }
+  parseRefundBudgets(result.data.REFUND_BUDGETS_JSON);
   return result.data;
 }
 

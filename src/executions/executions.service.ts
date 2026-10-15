@@ -1,8 +1,11 @@
+import { ConfigService } from '@nestjs/config';
+import { parseRefundBudgets } from '../budgets/refund-budget-config.js';
+import { RefundBudgetLedger } from '../budgets/refund-budget-ledger.js';
 import { BLOCK_CODE } from '../actions/action-block-code.js';
 import { EXECUTION_LEASE_MS, retryDelayMs, retryWindow } from './recovery-contract.js';
 import type { ConfirmedOutcome } from '../providers/action-provider.js';
 import { randomUUID } from 'node:crypto';
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import type { AuthenticatedAgent } from '../agent-credentials/agent-authentication.service.js';
 import type { ActionRequest } from '../actions/action-request.js';
 import { Prisma } from '../generated/prisma/client.js';
@@ -17,7 +20,10 @@ export type ExecutionOutcome =
 
 @Injectable()
 export class ExecutionsService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly budgets: RefundBudgetLedger;
+  constructor(private readonly prisma: PrismaService, @Optional() config?: ConfigService) {
+    this.budgets = new RefundBudgetLedger(parseRefundBudgets(config?.get<string>('REFUND_BUDGETS_JSON', '[]') ?? '[]'));
+  }
 
   async receive(request: ActionRequest, idempotencyKey: string, evaluate: () => {
     policyDecision: PolicyDecision; policyReason: string; policyHash: string; policyEvaluatedAt: Date;
@@ -108,6 +114,7 @@ export class ExecutionsService {
           leaseExpiresAt: new Date(Date.now() + EXECUTION_LEASE_MS), nextRetryAt: null },
       });
       if (changed.count === 0) return false;
+      await this.budgets.reserve(tx, await tx.execution.findUniqueOrThrow({ where: { id } }), new Date());
       await tx.executionAttempt.create({ data: {
         id: attemptId, organizationId: identity.organizationId, executionId: id,
         credentialId: identity.credentialId, attemptNumber: 1,
@@ -138,6 +145,7 @@ export class ExecutionsService {
         status: retryExecution(execution.status), attemptCount: next, errorCode: null,
         leaseExpiresAt: new Date(Date.now() + EXECUTION_LEASE_MS), nextRetryAt: null,
       } });
+      await this.budgets.reserve(tx, { ...execution, attemptCount: next }, new Date());
       await tx.executionAttempt.create({ data: {
         id: attemptId, organizationId: identity.organizationId, executionId: id,
         credentialId: identity.credentialId, attemptNumber: next,
@@ -177,6 +185,7 @@ export class ExecutionsService {
         data: { status: 'OUTCOME_UNKNOWN', errorCode: 'RECOVERED_PROVIDER_RECEIPT', finishedAt: now } });
       await tx.executionAttempt.updateMany({ where: { executionId: id, status: 'OUTCOME_UNKNOWN', resolvedAt: null },
         data: { resolvedAt: now, resolvedStatus: outcome.status } });
+      await this.budgets.settle(tx, id, outcome.status);
       await tx.execution.update({ where: { id }, data: {
         status: transitionExecution(execution.status, outcome.status), leaseExpiresAt: null, nextRetryAt: null,
         ...(outcome.status === 'SUCCEEDED' ? { result: outcome.result, errorCode: null } : { errorCode: outcome.errorCode }),
@@ -209,6 +218,7 @@ export class ExecutionsService {
         data: { status, finishedAt: new Date(), errorCode: outcome.status === 'SUCCEEDED' ? null : outcome.errorCode },
       });
       if (attempt.count !== 1) throw new ConflictException('Execution attempt missing');
+      await this.budgets.settle(tx, id, outcome.status);
       if (outcome.status !== 'OUTCOME_UNKNOWN') {
         await tx.executionAttempt.updateMany({ where: { executionId: id, status: 'OUTCOME_UNKNOWN', resolvedAt: null },
           data: { resolvedAt: new Date(), resolvedStatus: outcome.status } });
@@ -227,6 +237,7 @@ export class ExecutionsService {
         createdAt: true, updatedAt: true,
         policyDecision: true, policyReason: true, policyHash: true, policyEvaluatedAt: true,
         blockedPolicyDecision: true, blockedPolicyHash: true, blockedAt: true,
+        refundBudgetReservation: { select: { day: true, currency: true, amountMinor: true, status: true, settledAt: true } },
         approval: { select: { id: true, status: true, decidedByUserId: true, decidedAt: true } },
         attempts: { orderBy: { attemptNumber: 'asc' }, select: { id: true, attemptNumber: true, status: true, startedAt: true, finishedAt: true, errorCode: true, resolvedAt: true, resolvedStatus: true } },
       },

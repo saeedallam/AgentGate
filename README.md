@@ -164,3 +164,13 @@ OWNER-only reconciliation remains available when an agent is suspended. No
 background retry worker or real provider is introduced.
 See [contract, architecture, Windows steps and limits](docs/phase-e-safe-execution.md)
 and [Postman collection](docs/AgentGate-Phase-E.postman_collection.json).
+
+## Phase F — Stateful daily refund budget
+
+Optional server-configured budgets reserve daily USD capacity atomically with
+execution admission. Confirmed success consumes, definite failure releases, and
+unknown outcomes retain the hold. Retries reuse the original reservation; approval
+never bypasses the cap. UTC first-dispatch day and environment define the scope.
+Members can inspect aggregate usage through the JWT monitoring endpoint.
+See [configuration, rollout, semantics and Windows tests](docs/phase-f-daily-refund-budget.md)
+and [Postman collection](docs/AgentGate-Phase-F.postman_collection.json).

@@ -1,0 +1,134 @@
+{
+  "info": {
+    "name": "AgentGate Phase F \u2014 Daily Refund Budget",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Configure a clean scope with cap 10000 and an ALLOW USD refund policy. Seed budget_payment_a and budget_payment_b. Uses server-owned budgets; contains no secrets."
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:3000"
+    },
+    {
+      "key": "organizationId",
+      "value": ""
+    },
+    {
+      "key": "agentApiKey",
+      "value": ""
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "runId",
+      "value": "budget-01"
+    }
+  ],
+  "item": [
+    {
+      "name": "1 \u2014 Consume 6000 of 10000",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{agentApiKey}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "{{runId}}-a"
+          }
+        ],
+        "url": "{{baseUrl}}/v1/actions",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"action\": {\n    \"name\": \"refund.create\"\n  },\n  \"arguments\": {\n    \"paymentId\": \"budget_payment_a\",\n    \"amountMinor\": 6000,\n    \"currency\": \"USD\"\n  }\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "2 \u2014 Reject 5000 with only 4000 available",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{agentApiKey}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "{{runId}}-b"
+          }
+        ],
+        "url": "{{baseUrl}}/v1/actions",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"action\": {\n    \"name\": \"refund.create\"\n  },\n  \"arguments\": {\n    \"paymentId\": \"budget_payment_b\",\n    \"amountMinor\": 5000,\n    \"currency\": \"USD\"\n  }\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "3 \u2014 Consume exact remaining 4000",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{agentApiKey}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "{{runId}}-c"
+          }
+        ],
+        "url": "{{baseUrl}}/v1/actions",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"action\": {\n    \"name\": \"refund.create\"\n  },\n  \"arguments\": {\n    \"paymentId\": \"budget_payment_b\",\n    \"amountMinor\": 4000,\n    \"currency\": \"USD\"\n  }\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "4 \u2014 Inspect daily aggregate usage",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/v1/organizations/{{organizationId}}/refund-budgets?environment=development"
+      }
+    }
+  ]
+}

@@ -1,3 +1,4 @@
+import { RefundBudgetsController } from '../budgets/refund-budgets.controller.js';
 import { AuthModule } from '../auth/auth.module.js';
 import { RecoveryMonitoringController } from './recovery-monitoring.controller.js';
 import { PoliciesModule } from '../policies/policies.module.js';
@@ -11,7 +12,7 @@ import { ActionsService } from './actions.service.js';
 
 @Module({
   imports: [AuthModule, DatabaseModule, AgentCredentialsModule, PoliciesModule],
-  controllers: [ActionsController, RecoveryMonitoringController],
+  controllers: [ActionsController, RecoveryMonitoringController, RefundBudgetsController],
   providers: [ExecutionsService, FakeCommerceProvider, ActionsService],
 })
 export class ActionsModule {}

@@ -143,3 +143,16 @@ No automatic recovery, policy format change or approval reversal is included.
   result before claiming the native races passed.
 - Recovery eligibility test was introduced failing (module absent), then implemented.
 - No production database, real payment provider or populated user secrets were used.
+
+## Phase F daily refund budget — 2026-10-15
+
+Local build/lint and 93 ordinary tests passed. The embedded PostgreSQL-compatible
+lab passed 12 integration cases (including both budget HTTP/transaction cases).
+That lab is not independent-connection concurrency evidence. The backend workflow
+adds `refund-budget-concurrency.integration.cjs` alongside existing native races;
+inspect the published commit's GitHub Actions run for native PostgreSQL results.
+
+Coverage includes shared-agent cap races, exact boundary, unknown holds, retry
+reuse, stale-worker protection, settlement races, claim rollback, safe activation,
+configuration drift, UTC bucket rollover, tenant/environment isolation, approval
+gating and aggregate monitoring membership. No new external provider is exercised.

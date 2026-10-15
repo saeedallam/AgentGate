@@ -324,3 +324,16 @@ have yet been supplied for this phase.
 
 Exercise to answer in the learner's own words: why is NOT_FOUND insufficient to
 prove absence, and why must a retry preserve the provider operation key?
+
+## Phase F — prepared for joint E/F lesson (2026-10-15)
+
+Implementation completed before teaching at the learner's request. The following
+are instructor definitions, not claims about the learner's current understanding:
+
+- Reservation: capacity held for one admitted execution, including unknown results.
+- Consumption: reserved money confirmed as successfully refunded.
+- Release: capacity returned only after a definite no-effect failure.
+- Daily bucket: shared organization/environment/USD balance for first-dispatch UTC day.
+- Atomic admission: execution claim, attempt and reservation commit or roll back together.
+
+Learner wording and comprehension evaluation remain pending the joint E/F lesson.

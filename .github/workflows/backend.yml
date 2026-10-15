@@ -53,3 +53,5 @@ jobs:
           test/policy-tightening.integration.cjs
           test/execution-recovery.integration.cjs
           test/recovery-concurrency.integration.cjs
+          test/refund-budget.integration.cjs
+          test/refund-budget-concurrency.integration.cjs

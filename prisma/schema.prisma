@@ -53,6 +53,7 @@ model Organization {
   members      OrganizationMember[]
   agents       Agent[]
   fakePayments FakePayment[]
+  refundBudgetBuckets RefundBudgetBucket[]
 }
 
 model OrganizationMember {
@@ -111,6 +112,7 @@ model Execution {
   leaseExpiresAt DateTime? @db.Timestamptz(3)
   nextRetryAt DateTime? @db.Timestamptz(3)
   providerReceipt FakeProviderReceipt?
+  refundBudgetReservation RefundBudgetReservation?
   blockedPolicyDecision PolicyDecision?
   blockedPolicyHash String? @db.VarChar(64)
   blockedAt DateTime? @db.Timestamptz(3)
@@ -212,4 +214,40 @@ model FakeProviderReceipt {
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   execution Execution @relation(fields: [organizationId, executionId], references: [organizationId, id], onDelete: Cascade, onUpdate: Restrict)
   @@unique([organizationId, executionId])
+}
+
+// Scope is organization + execution environment + currency + first-dispatch UTC day.
+model RefundBudgetBucket {
+  organizationId String @db.Uuid
+  environment ExecutionEnvironment
+  currency String @db.VarChar(3)
+  day DateTime @db.Date
+  limitMinor Int
+  reservedMinor Int @default(0)
+  consumedMinor Int @default(0)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  reservations RefundBudgetReservation[]
+  @@id([organizationId, environment, currency, day])
+}
+
+enum RefundReservationStatus {
+  HELD
+  CONSUMED
+  RELEASED
+}
+
+model RefundBudgetReservation {
+  executionId String @id @db.Uuid
+  organizationId String @db.Uuid
+  environment ExecutionEnvironment
+  currency String @db.VarChar(3)
+  day DateTime @db.Date
+  amountMinor Int
+  status RefundReservationStatus @default(HELD)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  settledAt DateTime? @db.Timestamptz(3)
+  execution Execution @relation(fields: [organizationId, executionId], references: [organizationId, id], onDelete: Restrict, onUpdate: Restrict)
+  bucket RefundBudgetBucket @relation(fields: [organizationId, environment, currency, day], references: [organizationId, environment, currency, day], onDelete: Restrict, onUpdate: Restrict)
+  @@unique([organizationId, executionId])
+  @@index([organizationId, environment, currency, day])
 }
