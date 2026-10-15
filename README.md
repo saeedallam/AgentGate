@@ -174,3 +174,19 @@ never bypasses the cap. UTC first-dispatch day and environment define the scope.
 Members can inspect aggregate usage through the JWT monitoring endpoint.
 See [configuration, rollout, semantics and Windows tests](docs/phase-f-daily-refund-budget.md)
 and [Postman collection](docs/AgentGate-Phase-F.postman_collection.json).
+
+## Phases G/H — Observe, simulate and connect MCP
+
+`POST /v1/actions/observe` records a policy-only would-decision without executing.
+OWNER historical simulations test candidate rules without installing them or
+modifying execution evidence. Member monitoring returns redacted study metadata.
+See [Phase G](docs/phase-g-observation-simulation.md) and its
+[Postman collection](docs/AgentGate-Phase-G.postman_collection.json).
+
+The local stdio MCP adapter exposes six tools through the same authenticated HTTP
+API: refund_create, refund_observe, execution_get, execution_resume, execution_retry
+and execution_reconcile. It has no direct provider or database access and cannot
+approve requests. See [setup and security boundaries](docs/phase-h-mcp-adapter.md).
+
+The initial A–H vertical slice is complete within the Fake Commerce scope. See
+[implemented capabilities, deferred work and combined teaching plan](docs/project-roadmap-status.md).

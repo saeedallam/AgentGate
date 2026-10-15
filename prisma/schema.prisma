@@ -25,6 +25,7 @@ model User {
   createdAt    DateTime @default(now()) @db.Timestamptz(3)
   updatedAt    DateTime @updatedAt @db.Timestamptz(3)
 
+  policyStudies PolicyStudy[]
   memberships       OrganizationMember[]
   approvalDecisions Approval[]
 }
@@ -54,6 +55,7 @@ model Organization {
   agents       Agent[]
   fakePayments FakePayment[]
   refundBudgetBuckets RefundBudgetBucket[]
+  policyStudies PolicyStudy[]
 }
 
 model OrganizationMember {
@@ -81,6 +83,7 @@ model Agent {
   organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   credentials  AgentCredential[]
   executions   Execution[]
+  policyStudies PolicyStudy[]
 
   @@unique([organizationId, name])
   @@unique([organizationId, id])
@@ -250,4 +253,27 @@ model RefundBudgetReservation {
   bucket RefundBudgetBucket @relation(fields: [organizationId, environment, currency, day], references: [organizationId, environment, currency, day], onDelete: Restrict, onUpdate: Restrict)
   @@unique([organizationId, executionId])
   @@index([organizationId, environment, currency, day])
+}
+
+// Redacted policy-only evidence. Never an execution, approval or authorization token.
+enum PolicyStudyMode {
+  OBSERVE
+  SIMULATE
+}
+model PolicyStudy {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  agentId String? @db.Uuid
+  userId String? @db.Uuid
+  mode PolicyStudyMode
+  policyHash String @db.VarChar(64)
+  summary Json @db.JsonB
+  results Json @db.JsonB
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  expiresAt DateTime @db.Timestamptz(3)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  agent Agent? @relation(fields: [organizationId, agentId], references: [organizationId, id], onDelete: Restrict, onUpdate: Restrict)
+  user User? @relation(fields: [userId], references: [id], onDelete: Restrict)
+  @@index([organizationId, createdAt, id])
+  @@index([expiresAt])
 }

@@ -337,3 +337,19 @@ are instructor definitions, not claims about the learner's current understanding
 - Atomic admission: execution claim, attempt and reservation commit or roll back together.
 
 Learner wording and comprehension evaluation remain pending the joint E/F lesson.
+
+## G/H — implementation-first request (2026-10-15)
+
+The learner asked to finish the remaining original roadmap and explain the whole
+project afterward. The joint E/F lesson was paused at atomic claim/reservation.
+No new G/H definitions have yet been supplied by the learner.
+
+Instructor notes for the later lesson:
+- Observation: a recorded policy-only would-decision, with no external execution.
+- Historical simulation: candidate rules evaluated on verified stored requests;
+  it does not install rules or reproduce budgets/approvals/provider state.
+- Adapter: a transport translation that preserves the backend's security boundary.
+- MCP stdio: JSON-RPC over a host-launched process's stdin/stdout; stdout is not logs.
+- Transport uncertainty: no trusted response is not proof that no effect occurred.
+
+Learner wording, examples, exercises and comprehension checks remain pending.

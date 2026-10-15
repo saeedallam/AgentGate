@@ -55,3 +55,5 @@ jobs:
           test/recovery-concurrency.integration.cjs
           test/refund-budget.integration.cjs
           test/refund-budget-concurrency.integration.cjs
+          test/observations.integration.cjs
+          test/mcp-flow.integration.cjs

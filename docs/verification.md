@@ -156,3 +156,21 @@ Coverage includes shared-agent cap races, exact boundary, unknown holds, retry
 reuse, stale-worker protection, settlement races, claim rollback, safe activation,
 configuration drift, UTC bucket rollover, tenant/environment isolation, approval
 gating and aggregate monitoring membership. No new external provider is exercised.
+
+## Phases G/H — 2026-10-15
+
+Local verification: 96 ordinary tests, TypeScript build and lint passed; the embedded
+PostgreSQL-compatible lab passed 14 integration cases. The new MCP integration uses
+an actual SDK client, a compiled stdio subprocess and the real HTTP application.
+It is not a manual LLM/client-UI compatibility claim.
+
+The backend workflow now also runs observations.integration.cjs and
+mcp-flow.integration.cjs on PostgreSQL 17, alongside the three independent-connection
+race suites. Check the published commit's Actions run for native verification.
+
+New coverage: observe without fake dispatch enabled, would-deny/approval/allow,
+no execution/attempt/approval/budget/effect writes, OWNER simulation vs MEMBER read,
+foreign IDs/cursors, legacy/corrupt history skipping, immutable redacted evidence,
+expiry cleanup, frozen live DENY after simulated ALLOW; MCP initialize/list/call,
+strict inputs, fixed origins and no redirects, sanitized errors/no automatic retry,
+actual HTTP policy/approval/budget/replay/isolation and revoked-key enforcement.

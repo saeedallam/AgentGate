@@ -183,3 +183,20 @@ All nodes must use the same config/version when enabling enforcement. Existing
 daily caps are immutable. No velocity system, kill-switch administration, automatic
 scheduler, generic rules framework, simulation or MCP was added. See
 `docs/phase-f-daily-refund-budget.md` and the native concurrency suite.
+
+## Phases G/H implementation update (2026-10-15)
+
+The user explicitly authorized completing the remaining original roadmap before
+joint teaching. This supersedes the earlier 'do not implement now' note for G and
+the one-phase-at-a-time teaching cadence for this implementation task.
+
+G provides non-executing policy observation, OWNER-only bounded historical candidate
+simulation, redacted immutable 30-day evidence, scoped pagination and a bounded
+cleanup command. It never installs candidate policies or bypasses enforcement.
+H provides a local stdio MCP adapter using the official pinned SDK over existing
+agent-authenticated HTTP endpoints. No direct DB/provider access, OWNER approval
+tool, remote HTTP MCP listener, automatic retry or user-supplied URL is permitted.
+Tools accept strict schemas; backend authority is rechecked on every call.
+The initial A–H refund/Fake Commerce vertical slice is implemented. See
+`docs/project-roadmap-status.md` for deliberate production/future boundaries, and
+G/H guides for contracts. Do not call the whole product production-ready.

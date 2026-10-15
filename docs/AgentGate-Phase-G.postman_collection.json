@@ -1,0 +1,135 @@
+{
+  "info": {
+    "name": "AgentGate Phase G \u2014 Observe and Simulate",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Policy-only studies never execute or grant approval. Candidate rules are never installed."
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:3000"
+    },
+    {
+      "key": "agentApiKey",
+      "value": ""
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "organizationId",
+      "value": ""
+    },
+    {
+      "key": "executionId",
+      "value": ""
+    },
+    {
+      "key": "studyId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "1 \u2014 Observe without executing",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/v1/actions/observe",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{agentApiKey}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"action\": {\n    \"name\": \"refund.create\"\n  },\n  \"arguments\": {\n    \"paymentId\": \"payment_demo\",\n    \"amountMinor\": 6000,\n    \"currency\": \"USD\"\n  }\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (pm.response.code === 200) { pm.collectionVariables.set(\"studyId\", pm.response.json().id); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2 \u2014 OWNER simulates candidate policy",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/v1/organizations/{{organizationId}}/policy-simulations",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"executionIds\": [\n    \"{{executionId}}\"\n  ],\n  \"policies\": [\n    {\n      \"actionName\": \"refund.create\",\n      \"effect\": \"ALLOW\",\n      \"conditions\": [\n        {\n          \"field\": \"arguments.currency\",\n          \"operator\": \"EQ\",\n          \"value\": \"USD\"\n        },\n        {\n          \"field\": \"arguments.amountMinor\",\n          \"operator\": \"LTE\",\n          \"value\": 10000\n        }\n      ]\n    }\n  ]\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (pm.response.code === 200) { pm.collectionVariables.set(\"studyId\", pm.response.json().id); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3 \u2014 List redacted studies",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/v1/organizations/{{organizationId}}/policy-observations?limit=25",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ]
+      }
+    },
+    {
+      "name": "4 \u2014 Read study evidence",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/v1/organizations/{{organizationId}}/policy-observations/{{studyId}}",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ]
+      }
+    }
+  ]
+}
