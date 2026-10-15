@@ -174,3 +174,24 @@ foreign IDs/cursors, legacy/corrupt history skipping, immutable redacted evidenc
 expiry cleanup, frozen live DENY after simulated ALLOW; MCP initialize/list/call,
 strict inputs, fixed origins and no redirects, sanitized errors/no automatic retry,
 actual HTTP policy/approval/budget/replay/isolation and revoked-key enforcement.
+
+## Dependency and license maintenance — 2026-10-15
+
+Verified locally on Node 24.19.0 after a clean `npm ci` with the new lockfile:
+
+- Full `npm audit --json`: zero reported vulnerabilities (previously six affected entries).
+- Resolved Fastify 5.12.7, deepmerge-ts 8.0.2 and mysql2 3.24.6 through scoped overrides.
+- Prisma config loading/schema validation and client generation passed with Prisma 7.10.0.
+- TypeScript build, all 96 ordinary tests and lint passed.
+- All 14 migrations applied in the fresh embedded PostgreSQL-compatible lab;
+  14 integration cases passed, including HTTP/MCP, approvals, recovery and budgets.
+
+The embedded lab serializes database connections; it does not establish native
+race behavior. The release workflow separately verifies PostgreSQL 17 migrations,
+independent-connection race suites and the Docker build. Inspect the exact commit's
+Actions run before claiming those checks passed. No Docker daemon or native
+PostgreSQL server was available in the local execution environment.
+
+No application schema or authorization behavior was intentionally changed. The MIT
+license and package metadata agree. Dependency licenses remain separate. See
+[dependency maintenance](dependency-maintenance.md) for compatibility and limits.

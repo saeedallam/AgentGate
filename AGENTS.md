@@ -8,7 +8,7 @@ North star: the agent proposes an action; our system decides whether that exact 
 
 The user's latest direction supersedes the earlier customer-support niche: Fake Commerce is the first SaaS test environment, not the product's market boundary. Refund/account actions are concrete test scenarios. Keep commerce fields in action definitions/providers, not mandatory fields in generic execution or policy models.
 
-MCP is deferred transport/integration, not the product. The core must work without it. Protection covers actions routed through AgentGate, not direct provider calls that bypass it.
+MCP is an optional local stdio transport adapter, not the product. The core works without it. Protection covers actions routed through AgentGate, not direct provider calls that bypass it.
 
 ## Working method
 
@@ -98,7 +98,7 @@ Verify existing code/tests and update documentation. Finish credentials, agent a
 
 ### Phase B — Action Core
 Action registry, normalized ActionRequest, execution model, authenticated POST action requests, fake internal executor and persisted execution attempts/results. No advanced policies or real external side effects yet.
-Implemented as the refund.create vertical slice; see the current progress and verification sections. Policy evaluation/gating is implemented in Phase C; next implementation phase: D.
+Implemented as the refund.create vertical slice; see the latest progress and verification sections for the completed initial A–H scope.
 
 ### Phase C — Business-aware policies
 Policy/conditions and pure PolicyEngine on ActionRequest. Test argument-based ALLOW, REQUIRE_APPROVAL, DENY and default deny.
@@ -113,7 +113,7 @@ Idempotency keys, canonical fingerprints, business duplicate protection, safe re
 Start with one daily refund budget. Later velocity, counters, duplicate resource actions and kill/freeze behavior. Do not build a generic stream-processing system.
 
 ### Phase G — Observe/simulation
-Record would-deny/would-require-approval outcomes and simulate against suitable history. Do not implement now.
+Record would-deny/would-require-approval outcomes and simulate against suitable history. Implemented within the bounded policy-only scope described below.
 
 ### Phase H — MCP adapter
 Only after the core is stable. MCP tools/list and tools/call remain adapter concerns.
@@ -143,8 +143,9 @@ request and approval binding evidence, and explicit agent-authenticated resume f
 the stored request with policy/fingerprint checks and a conditional approved claim.
 Native PostgreSQL decision/claim races are exercised by
 test/approval-concurrency.integration.cjs and the backend verification workflow.
-Consult docs/verification.md for actual run evidence, not inferred results. General retry/reconciliation, budgets, simulation
-and MCP remain future work. See docs/phase-b-guide.md and docs/verification.md for limits.
+Consult docs/verification.md for actual run evidence, not inferred results. The E–H
+updates below supersede this historical B–D description. See
+docs/project-roadmap-status.md for current boundaries.
 
 npm test builds and runs test/*.test.cjs; database *.integration.cjs files require separate execution and a dedicated agentgate_test database with migrations applied. Do not infer integration success from npm test.
 
@@ -180,8 +181,8 @@ reservation on retries, including across midnight. Scope is first-dispatch UTC d
 not settlement date. Initial policy evidence remains unchanged; budget admission is
 a separate live gate. Old unbudgeted history is not silently assigned a balance.
 All nodes must use the same config/version when enabling enforcement. Existing
-daily caps are immutable. No velocity system, kill-switch administration, automatic
-scheduler, generic rules framework, simulation or MCP was added. See
+daily caps are immutable. This phase added no velocity system, kill-switch administration, automatic
+scheduler or generic rules framework; G/H subsequently added simulation and MCP. See
 `docs/phase-f-daily-refund-budget.md` and the native concurrency suite.
 
 ## Phases G/H implementation update (2026-10-15)
@@ -200,3 +201,13 @@ Tools accept strict schemas; backend authority is rechecked on every call.
 The initial A–H refund/Fake Commerce vertical slice is implemented. See
 `docs/project-roadmap-status.md` for deliberate production/future boundaries, and
 G/H guides for contracts. Do not call the whole product production-ready.
+
+## Dependency and repository maintenance (2026-10-15)
+
+Use Node 24.19.0 from .nvmrc; CI and Docker use the same version. Source is MIT
+licensed; preserve LICENSE and dependency license notices. Temporary parent-scoped
+overrides fix Fastify, deepmerge-ts and mysql2; review compatibility before changing
+them and remove them when upstream parent versions include fixes. Run the full
+audit (including development dependencies), Prisma config/generation/migrations,
+ordinary tests and native integration suites. Do not suppress audit failures or
+claim production readiness from green tests. See docs/dependency-maintenance.md.

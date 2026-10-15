@@ -12,7 +12,7 @@ Fake Commerce is our first SaaS test environment, with a support agent requestin
 
 Keep action requests, policy decisions, execution lifecycle and approvals general. Commerce-specific fields and validation belong to action definitions and providers.
 
-MCP is a future adapter. The core must remain useful without MCP.
+MCP is an optional local stdio adapter over the HTTP API. The core remains useful without MCP.
 
 ## Current implementation
 
@@ -45,8 +45,8 @@ records without decisions require review. See [decision persistence](docs/policy
 The policy gate runs before claim/provider dispatch. Configure POLICY_RULES_JSON;
 with its default [] new receipts are denied. See [Phase C setup and Postman guide](docs/phase-c-guide.md).
 
-The lab is disabled by default and cannot execute in production. Approvals and explicit
-fake-provider recovery are implemented; budgets, simulation and MCP remain planned.
+The lab is disabled by default and cannot execute in production. Approvals, explicit
+fake-provider recovery, daily refund budgets, policy studies and local stdio MCP are implemented.
 Administrative suspension/revocation endpoints are not yet implemented.
 
 اقرأ [الشرح المعماري بالعربي وشرح الـsyntax](docs/phase-b-arabic.md).
@@ -57,7 +57,14 @@ and set its local variables. Never export populated secrets.
 
 ## Local setup
 
-Requires Node.js 24.15+ (below 25), npm and Docker Compose v2.
+Use Node.js **24.19.0** (recorded in `.nvmrc` and `.node-version`), npm and Docker
+Compose v2 for the local database. The supported Node range is 24.15+ below 25;
+Node 22 is outside that range even if some tests happen to pass. CI and the
+Dockerfile use the same pinned Node version.
+
+On Windows, install Node 24.19.0 using the official [Node.js downloads](https://nodejs.org/en/download)
+or your existing version manager, reopen CMD, and check `node -v` before `npm ci`.
+See [dependency maintenance and Windows troubleshooting](docs/dependency-maintenance.md).
 
 Copy `.env.example` to `.env` (Windows CMD: `copy .env.example .env`; POSIX: `cp .env.example .env`). Set a private `JWT_ACCESS_SECRET`; generate one locally with:
 
@@ -87,6 +94,7 @@ Compose database credentials are for local development. Keep DATABASE_URL consis
 npm run prisma:validate
 npm test
 npm run lint
+npm run audit:dependencies
 ```
 
 `npm test` builds and runs `test/*.test.cjs`. It does not run `*.integration.cjs`.
@@ -127,7 +135,9 @@ Postman can exercise the management routes and the implemented /v1/actions endpo
 Phase C policy evaluation and dispatch gating are implemented. Phase D adds approvals and exact-action integrity (see below).
 Phase B remains a fake-only lab and does not authorize real side effects.
 
-The later refund policy scenario uses USD examples: up to $50 ALLOW; above $50 through $500 REQUIRE_APPROVAL; above $500 DENY. Duplicate refunds, budgets and velocity arrive in their respective phases.
+The refund policy scenario uses USD minor units (cents): up to 5000 ($50) ALLOW;
+above 5000 through 50000 ($500) REQUIRE_APPROVAL; above 50000 DENY. Duplicate refund
+protection and daily budgets are implemented; velocity limits remain deferred.
 
 ## Development approach
 
@@ -190,3 +200,12 @@ approve requests. See [setup and security boundaries](docs/phase-h-mcp-adapter.m
 
 The initial A–H vertical slice is complete within the Fake Commerce scope. See
 [implemented capabilities, deferred work and combined teaching plan](docs/project-roadmap-status.md).
+
+## License and security
+
+AgentGate source is available under the [MIT License](LICENSE), copyright 2026
+Saeed Allam. Third-party dependencies retain their own licenses. The package stays
+`private: true` to prevent accidental npm publication; this does not change the
+source license or prevent running a hosted service.
+
+Read [SECURITY.md](SECURITY.md) for reporting guidance and support boundaries.

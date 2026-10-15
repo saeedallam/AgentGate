@@ -353,3 +353,20 @@ Instructor notes for the later lesson:
 - Transport uncertainty: no trusted response is not proof that no effect occurred.
 
 Learner wording, examples, exercises and comprehension checks remain pending.
+
+## Dependency maintenance and MIT — 2026-10-15
+
+Implementation was requested before joint teaching. These are instructor notes;
+learner definitions and understanding have not yet been assessed.
+
+- A transitive dependency is brought in by another package, not necessarily used
+  directly by our source. Parent audit entries can refer to the same underlying flaw.
+- A scoped override changes the dependency resolved beneath a named parent. It is
+  temporary compatibility work, not proof that arbitrary major upgrades are safe.
+- A lockfile records the resolved dependency tree. `npm ci` installs that tree.
+- An audit checks published advisories; zero findings is not a security guarantee.
+- MIT licenses the project source. Dependencies keep their own licenses; the
+  license is not a security certificate or a claim of production readiness.
+
+Changed dependencies, Node pin, security guidance, CI checks and verification are
+documented in `docs/dependency-maintenance.md` and `docs/verification.md`.

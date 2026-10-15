@@ -12,11 +12,12 @@
     "db:migrate": "prisma migrate dev",
     "lint": "eslint .",
     "mcp:start": "node dist/mcp/main.js",
-    "observations:prune": "node scripts/prune-policy-studies.mjs"
+    "observations:prune": "node scripts/prune-policy-studies.mjs",
+    "audit:dependencies": "npm audit --audit-level=moderate"
   },
   "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "author": "Saeed Allam",
+  "license": "MIT",
   "type": "commonjs",
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.1",
@@ -46,5 +47,24 @@
   "private": true,
   "engines": {
     "node": ">=24.15.0 <25"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/saeedallam/AgentGate.git"
+  },
+  "bugs": {
+    "url": "https://github.com/saeedallam/AgentGate/issues"
+  },
+  "homepage": "https://github.com/saeedallam/AgentGate#readme",
+  "overrides": {
+    "@nestjs/platform-fastify": {
+      "fastify": "5.12.7"
+    },
+    "@prisma/config": {
+      "deepmerge-ts": "8.0.2"
+    },
+    "prisma": {
+      "mysql2": "3.24.6"
+    }
   }
 }
