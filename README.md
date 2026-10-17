@@ -2,6 +2,11 @@
 
 Runtime Action Safety Layer for AI Agents.
 
+**Arabic web console:** after starting the API, open
+[`http://127.0.0.1:3000/console`](http://127.0.0.1:3000/console) to manage workspaces,
+agents and approvals, inspect executions and budgets, and exercise Fake Commerce.
+It uses your actual backend data. See [setup, security and UI guide](docs/console-guide.md).
+
 **The agent proposes an action. AgentGate decides whether that exact action is allowed, under what conditions, and controls its execution with auditable evidence.**
 
 AgentGate is a general product for actions with real-world side effects: payments, refunds, messages, data changes, deployments and infrastructure operations. Its core is independent of the agent's model and transport protocol. Protection applies to actions routed through AgentGate; it cannot control direct execution that bypasses it.

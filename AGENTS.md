@@ -211,3 +211,16 @@ them and remove them when upstream parent versions include fixes. Run the full
 audit (including development dependencies), Prisma config/generation/migrations,
 ordinary tests and native integration suites. Do not suppress audit failures or
 claim production readiness from green tests. See docs/dependency-maintenance.md.
+
+## Web console update (2026-10-17)
+
+The user explicitly requested a working GUI before resuming teaching. This
+authorizes the focused same-origin console, not a production admin platform.
+`public/console` is served by allowlisted asset routes. New console monitoring
+APIs require JWT and stored membership; OWNER-only request/result fields must not
+be sent to MEMBER. Existing approval/action/recovery endpoints retain authority.
+Never persist browser JWT/API keys, rotate an ambiguous intent's key automatically,
+or send actions under a key belonging to a different selected workspace. Keep the
+MIT license and the native backend tests. Do not recreate docs/learning.md, which
+the user requested removing. Resume teaching at configuration and AppModule after
+this GUI task. See docs/console-guide.md for scope and verification limitations.

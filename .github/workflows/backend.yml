@@ -58,5 +58,6 @@ jobs:
           test/refund-budget-concurrency.integration.cjs
           test/observations.integration.cjs
           test/mcp-flow.integration.cjs
+          test/console-monitoring.integration.cjs
       - name: Verify Docker packaging
         run: docker build --tag agentgate:ci .

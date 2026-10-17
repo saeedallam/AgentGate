@@ -1,4 +1,5 @@
 import { ObservationsModule } from './observations/observations.module.js';
+import { ConsoleModule } from './console/console.module.js';
 import { ApprovalsModule } from './approvals/approvals.module.js';
 import { PoliciesModule } from './policies/policies.module.js';
 import { ActionsModule } from './actions/actions.module.js';
@@ -21,6 +22,7 @@ import { OrganizationsModule } from './organizations/organizations.module.js';
       validate: validateEnvironment,
     }),
     PoliciesModule,
+    ConsoleModule,
     ObservationsModule,
     ApprovalsModule,
     DatabaseModule,

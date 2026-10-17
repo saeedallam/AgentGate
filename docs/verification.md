@@ -195,3 +195,15 @@ PostgreSQL server was available in the local execution environment.
 No application schema or authorization behavior was intentionally changed. The MIT
 license and package metadata agree. Dependency licenses remain separate. See
 [dependency maintenance](dependency-maintenance.md) for compatibility and limits.
+
+## Arabic web console — 2026-10-17
+
+- TypeScript build, 102 ordinary tests and ESLint passed.
+- Three jsdom interaction tests cover authentication, tenant switching, foreign-key rejection, ambiguous-response replay and approval decisions without automatic execution.
+- All 15 embedded database integration cases passed, including the new console membership, owner/member redaction, cursor isolation and trusted agent identity checks.
+- Full dependency audit reports zero vulnerabilities; jsdom is development-only.
+- Static asset tests verify the explicit allowlist, CSP, no-store responses and protected data endpoints.
+- No browser rendering tool was available: DOM interaction checks are not visual browser QA. Review responsive appearance in a real browser.
+- Native PostgreSQL races and the Docker image are verified separately by the Backend verification workflow for the published commit.
+
+See [console guide](console-guide.md) for startup, supported flows and limitations.
