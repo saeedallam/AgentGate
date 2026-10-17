@@ -185,7 +185,7 @@ test("console DOM login escapes workspace names, separates agent identity and re
     await until(() =>
       h.doc
         .querySelector('[data-form="bind"] .form-error')
-        .textContent.includes("أخرى"),
+        .textContent.includes("another organization"),
     );
     assert.equal(h.calls.filter((c) => c.path === "/v1/actions").length, 0);
     h.submit('[data-form="bind"]', { key: "right-org-key" });
@@ -272,7 +272,7 @@ test("console DOM ignores responses from the previous workspace and clears the a
     select.value = orgB;
     select.dispatchEvent(new h.w.Event("change", { bubbles: true }));
     await until(() =>
-      h.doc.querySelector("#main").textContent.includes("أول وكيل"),
+      h.doc.querySelector("#main").textContent.includes("first agent"),
     );
     release({
       data: {

@@ -23,6 +23,8 @@ test("console serves only allowlisted public assets with a strict CSP and leaves
       "/console/model.mjs",
       "/console/styles.css",
       "/console/logo.svg",
+      "/console/fonts/dmsans.ttf",
+      "/console/fonts/manrope.ttf",
     ]) {
       const result = await app.inject({ method: "GET", url: path });
       assert.equal(result.statusCode, 200, path);
@@ -38,7 +40,7 @@ test("console serves only allowlisted public assets with a strict CSP and leaves
       assert.equal(result.headers["x-content-type-options"], "nosniff");
     }
     const html = (await app.inject({ method: "GET", url: "/console" })).body;
-    assert.match(html, /lang="ar" dir="rtl"/);
+    assert.match(html, /lang="en" dir="ltr"/);
     assert.equal(
       (await app.inject({ method: "GET", url: "/console/.env" })).statusCode,
       404,

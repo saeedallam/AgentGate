@@ -224,3 +224,8 @@ or send actions under a key belonging to a different selected workspace. Keep th
 MIT license and the native backend tests. Do not recreate docs/learning.md, which
 the user requested removing. Resume teaching at configuration and AppModule after
 this GUI task. See docs/console-guide.md for scope and verification limitations.
+
+The console language is English with LTR layout, as explicitly requested. Follow
+the original AgentGate Hive demo identity (hexagonal G, honey, forest green,
+white sidebar, DM Sans and Manrope), while retaining real backend data and
+working approval flows rather than the demo's sample records or obsolete labels.

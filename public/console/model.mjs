@@ -1,18 +1,18 @@
 export const labels = Object.freeze({
-  RECEIVED: "تم الاستلام",
-  EXECUTING: "قيد التنفيذ",
-  SUCCEEDED: "نجح",
-  FAILED: "فشل",
-  OUTCOME_UNKNOWN: "النتيجة غير مؤكدة",
-  DENIED: "ممنوع",
-  PENDING: "بانتظار القرار",
-  APPROVED: "تمت الموافقة",
-  REJECTED: "مرفوض",
-  ACTIVE: "نشط",
-  SUSPENDED: "موقوف",
-  ALLOW: "مسموح",
-  DENY: "منع",
-  REQUIRE_APPROVAL: "يحتاج موافقة",
+  RECEIVED: "Received",
+  EXECUTING: "Executing",
+  SUCCEEDED: "Succeeded",
+  FAILED: "Failed",
+  OUTCOME_UNKNOWN: "Outcome unknown",
+  DENIED: "Denied",
+  PENDING: "Pending",
+  APPROVED: "Approved",
+  REJECTED: "Rejected",
+  ACTIVE: "Active",
+  SUSPENDED: "Suspended",
+  ALLOW: "Allowed",
+  DENY: "Deny",
+  REQUIRE_APPROVAL: "Approval required",
 });
 export function escapeHtml(value) {
   return String(value ?? "").replace(
@@ -31,16 +31,20 @@ export function money(minor) {
 }
 export function usdToMinor(value) {
   if (!/^\d+(?:\.\d{1,2})?$/.test(value))
-    throw new Error("اكتب مبلغًا موجبًا بدولار USD وبحد أقصى منزلتين عشريتين.");
+    throw new Error(
+      "Enter a positive USD amount with at most two decimal places.",
+    );
   const [whole, fraction = ""] = value.split(".");
   const minor = Number(whole) * 100 + Number(fraction.padEnd(2, "0"));
   if (!Number.isSafeInteger(minor) || minor <= 0)
-    throw new Error("المبلغ غير صالح.");
+    throw new Error("Invalid amount.");
   return minor;
 }
 export function refundPayload(paymentId, amount) {
   if (!/^[A-Za-z0-9_-]+$/.test(paymentId) || paymentId.length > 128)
-    throw new Error("معرّف الدفعة يقبل الحروف والأرقام و - و _ فقط.");
+    throw new Error(
+      "Payment IDs accept letters, numbers, hyphens and underscores only.",
+    );
   return {
     action: { name: "refund.create" },
     arguments: { paymentId, amountMinor: usdToMinor(amount), currency: "USD" },
@@ -49,14 +53,14 @@ export function refundPayload(paymentId, amount) {
 // Freeze an intent before the network call; transport errors must not rotate its key.
 export function lockIntent(existing, body, key) {
   if (!/^[A-Za-z0-9_-]{1,128}$/.test(key))
-    throw new Error("مفتاح منع التكرار غير صالح.");
+    throw new Error("Invalid idempotency key.");
   if (existing) {
     if (
       existing.key !== key ||
       JSON.stringify(existing.body) !== JSON.stringify(body)
     )
       throw new Error(
-        "الطلب محفوظ بمفتاحه. أعد إرسال نفس الطلب أو ابدأ طلبًا جديدًا بشكل صريح.",
+        "The request is saved with its key. Resend the same request or explicitly start a new one.",
       );
     return existing;
   }

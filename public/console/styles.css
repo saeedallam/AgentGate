@@ -1,18 +1,32 @@
+@font-face {
+  font-family: "DM Sans";
+  font-style: normal;
+  font-weight: 100 1000;
+  font-display: swap;
+  src: url("/console/fonts/dmsans.ttf") format("truetype");
+}
+@font-face {
+  font-family: "Manrope";
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url("/console/fonts/manrope.ttf") format("truetype");
+}
 :root {
-  --bg: #f8f7f3;
+  --bg: #f7f8fa;
   --paper: #fff;
-  --ink: #242b28;
-  --muted: #737a72;
-  --line: #e8e9e1;
-  --honey: #efbb40;
+  --ink: #212722;
+  --muted: #828782;
+  --line: #e5e8e4;
+  --honey: #edbd45;
   --honey-soft: #fff5d7;
   --green: #276a50;
   --green-soft: #eaf5ee;
   --red: #a94437;
   --red-soft: #fcece7;
   --blue: #416c9b;
-  --radius: 18px;
-  font-family: Tahoma, Arial, sans-serif;
+  --radius: 10px;
+  font-family: "DM Sans", Arial, sans-serif;
   color: var(--ink);
   background: var(--bg);
   font-synthesis: none;
@@ -114,7 +128,7 @@ pre {
 .skip {
   position: fixed;
   top: -80px;
-  right: 16px;
+  inset-inline-start: 16px;
   z-index: 100;
   background: var(--ink);
   color: white;
@@ -138,7 +152,7 @@ pre {
   font-weight: 700;
   letter-spacing: -0.8px;
   direction: ltr;
-  justify-content: flex-end;
+  justify-content: flex-start;
 }
 .brand img {
   width: 37px;
@@ -431,19 +445,19 @@ input.control {
 }
 .app-shell {
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr);
+  grid-template-columns: 244px minmax(0, 1fr);
   min-height: 100vh;
 }
 .sidebar {
   background: #fff;
-  border-left: 1px solid var(--line);
+  border-inline-end: 1px solid var(--line);
   height: 100vh;
   position: sticky;
   top: 0;
-  padding: 28px 18px;
+  padding: 32px 20px;
   display: flex;
   flex-direction: column;
-  gap: 28px;
+  gap: 24px;
 }
 .sidebar .brand {
   padding: 0 8px;
@@ -486,7 +500,7 @@ input.control {
   border: 0;
   background: transparent;
   border-radius: 10px;
-  text-align: right;
+  text-align: start;
   color: #78816f;
   padding: 12px;
   display: flex;
@@ -563,7 +577,7 @@ input.control {
 }
 .breadcrumb b {
   color: var(--ink);
-  margin-right: 12px;
+  margin-inline-start: 12px;
   font-weight: 500;
 }
 .content {
@@ -628,7 +642,7 @@ input.control {
   border-collapse: collapse;
   width: 100%;
   white-space: nowrap;
-  text-align: right;
+  text-align: start;
 }
 .table th {
   background: #fafbf7;
@@ -653,7 +667,7 @@ input.control {
   font-weight: 600;
   color: var(--ink);
   text-decoration: none;
-  text-align: right;
+  text-align: start;
 }
 .table .link:hover {
   text-decoration: underline;
@@ -830,8 +844,8 @@ dialog::backdrop {
   font-size: 13px;
 }
 .timeline {
-  border-right: 2px solid #e9eddf;
-  padding-right: 20px;
+  border-inline-start: 2px solid #e9eddf;
+  padding-inline-start: 20px;
 }
 .timeline > div {
   position: relative;
@@ -840,7 +854,7 @@ dialog::backdrop {
 .timeline > div:before {
   content: "";
   position: absolute;
-  right: -26px;
+  inset-inline-start: -26px;
   top: 8px;
   width: 10px;
   height: 10px;
@@ -1046,16 +1060,16 @@ dialog::backdrop {
   }
   .sidebar {
     position: fixed;
-    right: 0;
+    left: 0;
     top: 0;
     width: 250px;
     z-index: 20;
-    transform: translateX(100%);
+    transform: translateX(-100%);
     transition: transform 0.2s;
   }
   .sidebar.open {
     transform: translateX(0);
-    box-shadow: -20px 0 70px #24302525;
+    box-shadow: 20px 0 70px #24302525;
   }
   .mobile-toggle {
     display: inline-flex;
@@ -1124,5 +1138,263 @@ dialog::backdrop {
   * {
     animation: none !important;
     transition: none !important;
+  }
+}
+
+/* Hive demo identity, applied to the authenticated console. */
+h1,
+h2,
+h3,
+.brand,
+.stat .number {
+  font-family: "Manrope", Arial, sans-serif;
+}
+h1 {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -1px;
+}
+h2 {
+  font-size: 14px;
+}
+.brand {
+  justify-content: flex-start;
+  font-size: 24px;
+  font-weight: 800;
+  gap: 9px;
+}
+.brand img {
+  width: 31px;
+  height: 34px;
+}
+.brand span {
+  color: var(--ink);
+}
+.brand small {
+  font:
+    12px "DM Sans",
+    sans-serif;
+  border: 1px solid var(--line);
+  padding: 0 4px;
+  color: var(--muted);
+}
+.sidebar {
+  overflow-y: auto;
+}
+.workspace {
+  background: white;
+  border-radius: 9px;
+  padding: 10px;
+}
+.workspace select {
+  font-size: 12px;
+}
+.workspace .role {
+  font-size: 10px;
+}
+.nav-label {
+  letter-spacing: 1.7px;
+}
+.nav button {
+  border-radius: 7px;
+  font-size: 13px;
+  padding: 11px 14px;
+  color: #747a75;
+}
+.nav button.active {
+  background: #f9f0d8;
+  color: #333b30;
+  font-weight: 500;
+}
+.nav button.active .icon {
+  color: #a3802a;
+}
+.sidebar-note b {
+  font:
+    600 15px/1.5 "Manrope",
+    sans-serif;
+  color: var(--ink);
+}
+.sidebar-note p {
+  margin-top: 10px;
+  font-size: 11px;
+  line-height: 1.8;
+}
+.bee {
+  font-size: 29px;
+  color: #caa243;
+  letter-spacing: -3px;
+  margin-bottom: 12px;
+}
+.topbar {
+  height: 78px;
+}
+.content {
+  max-width: 1460px;
+  padding-top: 36px;
+}
+.page-head p {
+  font-size: 12px;
+}
+.btn {
+  border-radius: 6px;
+  font-size: 12px;
+}
+.btn.primary {
+  border-color: #dfb345;
+  color: #3b341e;
+}
+.panel {
+  border-radius: 10px;
+}
+.stat {
+  border-radius: 9px;
+  padding: 20px;
+}
+.stat .stat-top {
+  font-size: 11px;
+}
+.stat .stat-icon {
+  background: none;
+  padding: 0;
+  color: #9da495;
+}
+.stat .number {
+  font-size: 30px;
+  font-weight: 600;
+  margin: 12px 0 7px;
+}
+.stat .small {
+  font-size: 10px;
+}
+.table th {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.table td {
+  font-size: 11px;
+}
+.panel-title .small {
+  font-size: 10px;
+}
+.pill {
+  border-radius: 5px;
+  font-size: 10px;
+}
+.hero {
+  background: #21392d;
+  border-radius: 12px;
+  color: white;
+  min-height: 245px;
+  display: flex;
+  align-items: center;
+  position: relative;
+  overflow: hidden;
+  padding: 30px 34px;
+}
+.hero-copy {
+  z-index: 1;
+  max-width: 57%;
+}
+.hero .eyebrow {
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: #d0bf7c;
+  margin: 0;
+}
+.hero h2 {
+  font-size: 29px;
+  font-weight: 500;
+  letter-spacing: -0.9px;
+  line-height: 1.3;
+  margin: 12px 0;
+}
+.hero h2 em {
+  font-style: normal;
+  color: #e7c76c;
+}
+.hero p {
+  font-size: 11px;
+  color: #b4c3b6;
+  line-height: 1.8;
+  margin-bottom: 20px;
+}
+.hero .hero-button {
+  background: #f4e6b8;
+  border: none;
+  color: #37432f;
+  padding: 9px 13px;
+  font-size: 10px;
+  min-height: 32px;
+}
+.hive-art {
+  position: absolute;
+  width: 380px;
+  right: 15px;
+  top: 0;
+  height: 100%;
+  opacity: 0.95;
+}
+.overview-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1.9fr) minmax(280px, 1fr);
+  gap: 22px;
+  align-items: start;
+}
+.overview-columns .panel {
+  min-width: 0;
+}
+.bar-row {
+  grid-template-columns: 100px minmax(30px, 1fr) 30px;
+  font-size: 11px;
+}
+.console-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 10px;
+  color: var(--muted);
+}
+@media (min-width: 1450px) {
+  .hero h2 {
+    font-size: 34px;
+  }
+  .hive-art {
+    width: 450px;
+  }
+}
+@media (max-width: 1150px) {
+  .overview-columns {
+    grid-template-columns: 1fr;
+  }
+  .hero-copy {
+    max-width: 65%;
+  }
+  .hive-art {
+    right: -80px;
+    opacity: 0.5;
+  }
+}
+@media (max-width: 760px) {
+  .hero {
+    padding: 25px;
+    min-height: 220px;
+  }
+  .hero-copy {
+    max-width: 100%;
+  }
+  .hero h2 {
+    font-size: 26px;
+  }
+  .hive-art {
+    right: -140px;
+    opacity: 0.22;
+  }
+  .console-footer {
+    flex-direction: column;
+  }
+  .topbar {
+    height: 62px;
   }
 }

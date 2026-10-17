@@ -12,14 +12,13 @@ const assets = new Map(
     ["model.mjs", "text/javascript; charset=utf-8"],
     ["styles.css", "text/css; charset=utf-8"],
     ["logo.svg", "image/svg+xml"],
+    ["fonts/dmsans.ttf", "font/ttf"],
+    ["fonts/manrope.ttf", "font/ttf"],
   ].map(([name, type]) => [
     name!,
     {
       type: type!,
-      body: readFileSync(
-        resolve(__dirname, "../../public/console", name!),
-        "utf8",
-      ),
+      body: readFileSync(resolve(__dirname, "../../public/console", name!)),
     },
   ]),
 );
@@ -52,6 +51,12 @@ export class ConsoleAssetsController {
   }
   @Get("console/styles.css") style(@Res() reply: FastifyReply) {
     return this.send(reply, "styles.css");
+  }
+  @Get("console/fonts/dmsans.ttf") dmSans(@Res() reply: FastifyReply) {
+    return this.send(reply, "fonts/dmsans.ttf");
+  }
+  @Get("console/fonts/manrope.ttf") manrope(@Res() reply: FastifyReply) {
+    return this.send(reply, "fonts/manrope.ttf");
   }
   @Get("console/logo.svg") logo(@Res() reply: FastifyReply) {
     return this.send(reply, "logo.svg");

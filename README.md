@@ -2,7 +2,7 @@
 
 Runtime Action Safety Layer for AI Agents.
 
-**Arabic web console:** after starting the API, open
+**English Hive web console:** after starting the API, open
 [`http://127.0.0.1:3000/console`](http://127.0.0.1:3000/console) to manage workspaces,
 agents and approvals, inspect executions and budgets, and exercise Fake Commerce.
 It uses your actual backend data. See [setup, security and UI guide](docs/console-guide.md).
