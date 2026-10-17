@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="360" viewBox="0 0 1200 360" role="img" aria-labelledby="title desc">
+  <title id="title">AgentGate — Control the swarm</title>
+  <desc id="desc">A honey-gold hexagonal G on a forest-green background. Let agents do the work. You set the boundaries.</desc>
+  <defs>
+    <pattern id="hive" width="90" height="104" patternUnits="userSpaceOnUse"><path d="M45 2 88 27v50l-43 25L2 77V27Z" fill="none" stroke="#b8c8ab" stroke-opacity=".10"/></pattern>
+    <radialGradient id="glow"><stop stop-color="#e5c86d" stop-opacity=".13"/><stop offset="1" stop-color="#e5c86d" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect width="1200" height="360" rx="18" fill="#21392d"/>
+  <rect x="700" width="500" height="360" fill="url(#hive)"/>
+  <circle cx="970" cy="180" r="180" fill="url(#glow)"/>
+  <g transform="translate(54 43) scale(.64)"><path fill="#edbd45" d="M32 3 57 17v13H45V24L32 16 19 24v16l13 8 13-8v-3H30V26h27v21L32 61 7 47V17Z"/></g>
+  <text x="106" y="73" fill="#fff" font-family="Arial, sans-serif" font-weight="700" font-size="30" letter-spacing="-1">AgentGate</text>
+  <text x="56" y="125" fill="#d0bf7c" font-family="Arial, sans-serif" font-size="11" letter-spacing="3">THE CONTROL LAYER FOR YOUR AGENTS</text>
+  <text x="54" y="186" fill="#fff" font-family="Arial, sans-serif" font-size="43" letter-spacing="-1">Let agents do the work.</text>
+  <text x="54" y="240" fill="#e7c76c" font-family="Arial, sans-serif" font-size="43" letter-spacing="-1">You set the boundaries.</text>
+  <text x="56" y="300" fill="#b4c3b6" font-family="Arial, sans-serif" font-size="15">Policies. Human approvals. Controlled execution.</text>
+  <path d="m970 65 100 58v114l-100 58-100-58V123Z" fill="none" stroke="#d8bf68" stroke-opacity=".3"/>
+  <path d="m970 89 79 46v90l-79 46-79-46v-90Z" fill="#2c4735" stroke="#d8bf68" stroke-opacity=".7"/>
+  <g transform="translate(906 116) scale(2)"><path fill="#e7c76c" d="M32 3 57 17v13H45V24L32 16 19 24v16l13 8 13-8v-3H30V26h27v21L32 61 7 47V17Z"/></g>
+  <path d="M755 180h82l32-18h22m159 18h38l27 17h58" fill="none" stroke="#cab469" stroke-dasharray="4 6"/>
+  <circle cx="837" cy="180" r="4" fill="#d6bd65"/><circle cx="1115" cy="197" r="4" fill="#d6bd65"/>
+</svg>

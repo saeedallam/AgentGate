@@ -1,97 +1,156 @@
-# AgentGate
+<div align="center">
+  <img src="docs/assets/readme-hero.svg" alt="AgentGate — Let agents do the work. You set the boundaries." width="100%" />
 
-Runtime Action Safety Layer for AI Agents.
+  <h1>AgentGate</h1>
+  <p><strong>Runtime action safety for AI agents.</strong><br />The agent proposes. Your policies decide. Execution leaves a trail.</p>
 
-**English Hive web console:** after starting the API, open
-[`http://127.0.0.1:3000/console`](http://127.0.0.1:3000/console) to manage workspaces,
-agents and approvals, inspect executions and budgets, and exercise Fake Commerce.
-It uses your actual backend data. See [setup, security and UI guide](docs/console-guide.md).
+  <a href="https://github.com/saeedallam/AgentGate/actions/workflows/backend.yml"><img src="https://github.com/saeedallam/AgentGate/actions/workflows/backend.yml/badge.svg?branch=main" alt="Backend verification" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-edbd45" alt="License: MIT" /></a>
+  <a href=".nvmrc"><img src="https://img.shields.io/badge/Node.js-24.19.0-28765a" alt="Node.js 24.19.0" /></a>
+  <a href="docs/project-roadmap-status.md"><img src="https://img.shields.io/badge/status-Fake%20Commerce%20lab-21392d" alt="Status: Fake Commerce lab" /></a>
 
-**The agent proposes an action. AgentGate decides whether that exact action is allowed, under what conditions, and controls its execution with auditable evidence.**
+  <p>
+    <a href="#quick-start">Quick start</a> ·
+    <a href="#the-hive-console">Web console</a> ·
+    <a href="#how-it-works">Architecture</a> ·
+    <a href="#documentation">Documentation</a> ·
+    <a href="SECURITY.md">Security</a>
+  </p>
+</div>
 
-AgentGate is a general product for actions with real-world side effects: payments, refunds, messages, data changes, deployments and infrastructure operations. Its core is independent of the agent's model and transport protocol. Protection applies to actions routed through AgentGate; it cannot control direct execution that bypasses it.
+---
 
-## Product direction
+## Why AgentGate?
 
-Fake Commerce is our first SaaS test environment, with a support agent requesting `refund.create`. It is a concrete implementation and testing scenario, not a restriction of the product to customer support or commerce.
+An agent can propose a valid action that should never execute. A refund may exceed a limit, belong to another organization, require a human decision, or have already happened despite a lost response.
 
-Keep action requests, policy decisions, execution lifecycle and approvals general. Commerce-specific fields and validation belong to action definitions and providers.
+**AgentGate puts an explicit control layer between the agent and the side effect.** It authenticates the agent, validates the action, records a policy decision, binds approvals to the exact request, and controls dispatch and recovery.
 
-MCP is an optional local stdio adapter over the HTTP API. The core remains useful without MCP.
+The core is independent of the model and transport. **Fake Commerce is the first test environment, not the product boundary.** The current working action is `refund.create`; more domains and real providers are future work.
 
-## Current implementation
+> **Current scope:** a working, tested Fake Commerce vertical slice with an English web console and local MCP adapter. It is not a production-readiness claim. Protection applies only to actions routed through AgentGate.
 
-The identity foundation includes:
+## Built into the gate
 
-- NestJS/Fastify, configuration validation, health/readiness and PostgreSQL/Prisma.
-- User, Organization, OrganizationMember, Agent and AgentCredential models and migrations.
-- Registration with Argon2 password hashing, login and JWT authentication.
-- Organization membership checks and tenant-scoped agent creation, listing and reading.
-- Owner-authorized credential issuance via `POST /agents/:id/credentials`.
-- `agt_live_...` keys returned on creation only; only prefix and hash are stored.
-- Agent authentication rejects invalid keys, revoked credentials and suspended agents.
-- AgentAuthGuard extracts a Bearer key and assigns database-derived agent identity.
-- Unit, HTTP and database integration test files.
+| Capability | What it does |
+| --- | --- |
+| **Trusted identity** | JWT user sessions, organization membership and hashed agent credentials. Tenant identity comes from authentication, not the request body. |
+| **Deterministic policies** | Default deny. Among matching rules: `DENY` → `REQUIRE_APPROVAL` → `ALLOW`. Initial decision evidence is persisted. |
+| **Exact-action approvals** | Owners review the stored request. Approvals bind to its fingerprint; a decision alone never dispatches the action. |
+| **Replay protection** | The same agent, idempotency key and payload return the existing execution. A changed payload conflicts. |
+| **Explicit recovery** | Reconcile uncertain outcomes, preserve provider operation keys, and fence stale attempts. Fake-provider retries are bounded. |
+| **Daily budgets** | Reserve capacity before dispatch. Confirmed success consumes it; definite failure releases it; unknown outcomes retain the hold. |
+| **Observe and simulate** | Evaluate hypothetical decisions without executing actions or granting permission. |
+| **HTTP, console and MCP** | Different entry points, with the existing backend authorization and execution controls retained. |
 
-Phase B now provides a complete fake-only refund flow:
+## The Hive console
 
-- Action registry and normalized ActionRequest factory.
-- Persisted execution lifecycle; Phase E adds bounded numbered recovery attempts.
-- Tenant-owned Fake Commerce payment fixtures and simulated refunds.
-- POST /v1/actions and GET /v1/executions/:id with agent authentication.
-- Per-agent Idempotency-Key matching, atomic claim, duplicate fake refund protection,
-  stable outcomes and no automatic replay of ambiguous/unfinished effects.
+A same-origin English dashboard with a honey-and-forest identity. It reads **your backend data**, not seeded browser-only demo records.
 
-Phase C adds validated, tenant-scoped server policies and a pure PolicyEngine.
-DENY overrides REQUIRE_APPROVAL, which overrides ALLOW; no matching grant denies.
-Initial decisions, reasons, evaluation times and rule fingerprints are persisted.
-Same-key replay cannot upgrade a saved DENY or REQUIRE_APPROVAL; legacy pending
-records without decisions require review. See [decision persistence](docs/policy-persistence.md).
-The policy gate runs before claim/provider dispatch. Configure POLICY_RULES_JSON;
-with its default [] new receipts are denied. See [Phase C setup and Postman guide](docs/phase-c-guide.md).
+- **Overview & executions** — inspect recorded outcomes, policy evidence and attempts.
+- **Agents & keys** — create agent identities and issue owner-authorized credentials.
+- **Approvals** — review exact stored actions and approve or reject them.
+- **Budgets & studies** — monitor capacity and explore non-executing policy simulations.
+- **Action playground** — observe or submit a fake refund through the protected API.
 
-The lab is disabled by default and cannot execute in production. Approvals, explicit
-fake-provider recovery, daily refund budgets, policy studies and local stdio MCP are implemented.
-Administrative suspension/revocation endpoints are not yet implemented.
+After startup, open **[localhost:3000/console](http://localhost:3000/console)**. Sign in with an existing account or create one. JWTs and agent keys stay in page memory; reloading requires signing in again.
 
-اقرأ [الشرح المعماري بالعربي وشرح الـsyntax](docs/phase-b-arabic.md).
+See the [console guide](docs/console-guide.md) for setup, permissions and first-action walkthroughs.
 
-See [Phase B architecture, syntax and Postman guide](docs/phase-b-guide.md).
-Import [the Postman collection](docs/AgentGate-Phase-B.postman_collection.json)
-and set its local variables. Never export populated secrets.
+## How it works
 
-## Local setup
+```mermaid
+flowchart TD
+    Agent[Agent via HTTP or local MCP] --> Identity[Authenticate and validate]
+    Identity --> Policy[Record policy decision]
+    Policy -->|Deny| Stop[Stop before dispatch]
+    Policy -->|Require approval| Review[Owner reviews the exact action]
+    Policy -->|Allow| Gate[Check current permission and claim execution]
+    Review -->|Approved and explicitly resumed| Gate
+    Gate --> Budget[Reserve configured budget]
+    Budget --> Provider[Fake Commerce provider]
+    Provider --> Evidence[Record outcome and settle or retain reservation]
+```
 
-Use Node.js **24.19.0** (recorded in `.nvmrc` and `.node-version`), npm and Docker
-Compose v2 for the local database. The supported Node range is 24.15+ below 25;
-Node 22 is outside that range even if some tests happen to pass. CI and the
-Dockerfile use the same pinned Node version.
+The diagram is conceptual: **execution admission and budget reservation are atomic**. Current policy, approval binding and agent eligibility still govern execution. Unknown outcomes stay uncertain until evidence resolves them; a missing response is not permission to repeat the effect.
 
-On Windows, install Node 24.19.0 using the official [Node.js downloads](https://nodejs.org/en/download)
-or your existing version manager, reopen CMD, and check `node -v` before `npm ci`.
-See [dependency maintenance and Windows troubleshooting](docs/dependency-maintenance.md).
+The implementation is a **modular monolith**:
 
-Copy `.env.example` to `.env` (Windows CMD: `copy .env.example .env`; POSIX: `cp .env.example .env`). Set a private `JWT_ACCESS_SECRET`; generate one locally with:
+| Layer | Main code |
+| --- | --- |
+| HTTP orchestration and console | [`src/actions`](src/actions), [`src/console`](src/console) |
+| Identity and tenant boundaries | [`src/auth`](src/auth), [`src/agent-credentials`](src/agent-credentials) |
+| Policy and human decisions | [`src/policies`](src/policies), [`src/approvals`](src/approvals) |
+| Execution, recovery and capacity | [`src/executions`](src/executions), [`src/budgets`](src/budgets) |
+| Provider and optional transport | [`src/fake-commerce`](src/fake-commerce), [`src/providers`](src/providers), [`src/mcp`](src/mcp) |
+| Observation and persistence | [`src/observations`](src/observations), [`prisma/schema.prisma`](prisma/schema.prisma) |
+
+**Stack:** TypeScript · NestJS · Fastify · PostgreSQL · Prisma · Zod · JWT · Argon2.
+
+## Quick start
+
+### 1. Prepare the environment
+
+Use **Node.js 24.19.0**, npm and Docker Compose v2. The pinned version is shared by `.nvmrc`, CI and Docker. Node 22 is outside the supported range.
+
+```sh
+git clone https://github.com/saeedallam/AgentGate.git
+cd AgentGate
+npm ci
+```
+
+Copy `.env.example` to `.env`:
+
+| Terminal | Command |
+| --- | --- |
+| Windows CMD | `copy .env.example .env` |
+| macOS / Linux | `cp .env.example .env` |
+
+Generate a secret locally and put it in `JWT_ACCESS_SECRET` in your `.env`:
 
 ```sh
 node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
 ```
 
-Paste the value into your local `.env`. Do not commit or share it.
+Do not commit or share that value. If the project is already configured, keep your existing `.env`.
+
+### 2. Start the database and API
+
+Start Docker Desktop first if you use it, then run:
 
 ```sh
-npm ci
-npm run prisma:generate
 docker compose up -d --wait postgres
+npm run prisma:generate
 npx prisma migrate deploy
 npm run build
 npm start
 ```
 
-- `GET http://localhost:3000/health`: process liveness.
-- `GET http://localhost:3000/health/ready`: database readiness, with sanitized failure responses.
+| URL | Purpose |
+| --- | --- |
+| [localhost:3000/console](http://localhost:3000/console) | Sign in to the web console |
+| [localhost:3000/health](http://localhost:3000/health) | Check that the process is running |
+| [localhost:3000/health/ready](http://localhost:3000/health/ready) | Check database connectivity |
 
-Compose database credentials are for local development. Keep DATABASE_URL consistent with your configuration; existing volumes retain their original credentials. The optional Compose API profile still needs JWT_ACCESS_SECRET wiring before it is a complete startup path; the instructions above run the API locally.
+**A running server does not imply a ready database.** If login fails and readiness returns `503`, check PostgreSQL and `DATABASE_URL` first. Existing database volumes retain their original credentials.
+
+These instructions run the API locally. The optional Compose API profile needs `JWT_ACCESS_SECRET` wiring before use. See [Windows and dependency troubleshooting](docs/dependency-maintenance.md), including Argon2 build issues.
+
+### 3. Try a protected action
+
+The fake execution lab is **off by default** and prohibited in production. New requests are denied when `POLICY_RULES_JSON=[]`.
+
+Use the [console getting-started guide](docs/console-guide.md) to create a workspace and agent, configure a development policy, and seed a tenant-owned fake payment. Keep keys outside the repository.
+
+The sample USD refund policy uses integer **cents**:
+
+| Amount | Sample policy decision |
+| --- | --- |
+| Up to $50 (`5000`) | `ALLOW` |
+| Above $50 through $500 (`50000`) | `REQUIRE_APPROVAL` |
+| Above $500 | `DENY` |
+
+These are sample configured rules, not universal hardcoded product limits. Provider checks, duplicate protection and configured daily budgets also apply.
 
 ## Verification
 
@@ -102,9 +161,12 @@ npm run lint
 npm run audit:dependencies
 ```
 
-`npm test` builds and runs `test/*.test.cjs`. It does not run `*.integration.cjs`.
+`npm test` builds and runs `test/*.test.cjs`. Database `*.integration.cjs` suites run separately.
 
-For database integration tests, create a dedicated disposable database named `agentgate_test`, apply the existing migrations to that database, and set TEST_DATABASE_URL to its connection URL. Never use a production database. For example, with the default local Compose credentials, create the database once:
+<details>
+<summary><strong>Run database integration tests locally</strong></summary>
+
+Create a dedicated disposable database named `agentgate_test`. With the default local Compose credentials, run once:
 
 ```sh
 docker compose exec postgres psql -U agentgate -d postgres -c "CREATE DATABASE agentgate_test;"
@@ -117,100 +179,54 @@ set "TEST_DATABASE_URL=postgresql://agentgate:local-development-only@localhost:5
 set "DATABASE_URL=%TEST_DATABASE_URL%"
 npx prisma migrate deploy
 npm run build
-node --test test/agent-credentials.integration.cjs test/agent-credentials-http.integration.cjs test/agent-authentication.integration.cjs
+node --test --test-concurrency=1 test/actions-http.integration.cjs test/approval-concurrency.integration.cjs test/recovery-concurrency.integration.cjs test/refund-budget-concurrency.integration.cjs
 ```
 
-The DATABASE_URL override in that window targets the test database. Use your normal development environment when starting the application. Other integration tests are available under `test/`.
+This is a representative subset. See the [backend workflow](.github/workflows/backend.yml) for its complete suite and [verification notes](docs/verification.md) for evidence and limitations.
 
-Postman can exercise the management routes and the implemented /v1/actions endpoint. It complements automated tests.
+That CMD window now targets the **test database**. Use your normal development environment when starting the application. Never point these suites at production data. Postman complements automated tests; do not export populated credentials.
 
-## Roadmap
+</details>
 
-| Phase | Scope |
-| --- | --- |
-| A — Identity foundation | Verify identity, credentials, suspension enforcement and tenant isolation; keep documentation current. |
-| B — Action Core | Action registry, normalized ActionRequest, execution model, authenticated POST route, fake executor and persisted attempts/results. |
-| C — Business-aware policies | Pure deterministic policy logic, argument/resource conditions, default DENY and ALLOW / DENY / REQUIRE_APPROVAL. |
-| D — Approval integrity | Exact-action approvals, immutable approved payload and concurrency/double-approval protection. |
-| E — Safe execution | Idempotency, canonical fingerprints, duplicate detection, safe retries and unknown outcomes. |
-| F — Stateful rules | Start with one daily refund budget rule; later add velocity and other limits. |
-| G — Observe/simulation | Record hypothetical decisions and replay policies against suitable execution history. |
-| H — MCP adapter | Normalize MCP into the stable Action Core. |
+[GitHub Actions](https://github.com/saeedallam/AgentGate/actions/workflows/backend.yml) runs dependency auditing, ordinary tests, native PostgreSQL integrity/concurrency suites and Docker packaging. Check the current run rather than relying on a fixed test-count claim.
 
-Phase C policy evaluation and dispatch gating are implemented. Phase D adds approvals and exact-action integrity (see below).
-Phase B remains a fake-only lab and does not authorize real side effects.
+## Documentation
 
-The refund policy scenario uses USD minor units (cents): up to 5000 ($50) ALLOW;
-above 5000 through 50000 ($500) REQUIRE_APPROVAL; above 50000 DENY. Duplicate refund
-protection and daily budgets are implemented; velocity limits remain deferred.
+| Explore | Guide | Postman |
+| --- | --- | --- |
+| Console and first use | [Web console](docs/console-guide.md) | — |
+| Action contract and execution | [Phase B](docs/phase-b-guide.md) · [Arabic architecture & syntax](docs/phase-b-arabic.md) | [Collection](docs/AgentGate-Phase-B.postman_collection.json) |
+| Policy evaluation | [Phase C](docs/phase-c-guide.md) · [Persistence](docs/policy-persistence.md) · [Tightening](docs/policy-tightening.md) | [Collection](docs/AgentGate-Phase-C.postman_collection.json) |
+| Human approvals | [Phase D](docs/phase-d-approvals.md) | [Collection](docs/AgentGate-Phase-D.postman_collection.json) |
+| Safe recovery | [Phase E](docs/phase-e-safe-execution.md) | [Collection](docs/AgentGate-Phase-E.postman_collection.json) |
+| Daily refund budgets | [Phase F](docs/phase-f-daily-refund-budget.md) | [Collection](docs/AgentGate-Phase-F.postman_collection.json) |
+| Observation and simulation | [Phase G](docs/phase-g-observation-simulation.md) | [Collection](docs/AgentGate-Phase-G.postman_collection.json) |
+| Local stdio adapter | [Phase H / MCP](docs/phase-h-mcp-adapter.md) | — |
+| Scope and engineering | [Roadmap status](docs/project-roadmap-status.md) · [Verification](docs/verification.md) · [Project constitution](AGENTS.md) | — |
 
-## Development approach
+## Scope and next steps
 
-Preserve the existing modular monolith and migrations. Explain each component's problem and design before implementing a small tested slice. Add modules and abstractions only when needed. See [AGENTS.md](AGENTS.md) for the project constitution and security rules.
+The initial **A–H Fake Commerce slice is implemented**, including the connected console. AgentGate is designed to grow across action domains, but currently registers only `refund.create`.
 
+Deliberate boundaries today:
 
+- **No real payment provider** or guarantee of exactly-once external effects. Real integrations need their own idempotency and reconciliation contract.
+- **Explicit recovery**, not an automatic retry worker. New supported executions have at most three numbered attempts; legacy records are not silently upgraded.
+- **Server-configured policies and budgets**, not a policy-management UI. Serving nodes must use compatible snapshots.
+- **Local stdio MCP**, not a public remote MCP service. MCP cannot approve requests or bypass the HTTP API.
+- General action rate limits, suspend/revoke administration endpoints, approval expiry, broader audit capabilities and production operations remain future work.
 
-## Phase D — Approval workflow
+See the [roadmap status](docs/project-roadmap-status.md) for the full boundary between implemented features and plans.
 
-Phase D adds one approval per exact stored request, OWNER decisions using JWT,
-summary-only MEMBER monitoring, database immutability checks, and explicit
-agent-authenticated `POST /v1/executions/:id/resume`. A human decision alone never
-calls the provider. Current DENY still blocks an approved action; started attempts
-are never automatically retried, including OUTCOME_UNKNOWN.
+## Security and license
 
-See [approval architecture, limits and Windows verification](docs/phase-d-approvals.md)
-and import [the Phase D Postman collection](docs/AgentGate-Phase-D.postman_collection.json).
-The backend workflow runs ordinary tests and the Phase C/D database suites against
-PostgreSQL 17. A workflow's existence does not mean its current run passed; inspect
-GitHub Actions or run the native concurrency test locally.
+Read [SECURITY.md](SECURITY.md) for reporting guidance. Never publish passwords, JWTs, agent keys or unrestricted request data in issues or screenshots.
 
-### Policy tightening
+AgentGate is licensed under **[MIT](LICENSE)**. Copyright © 2026 Saeed Allam. Dependencies retain their own licenses; bundled DM Sans and Manrope fonts include their SIL Open Font Licenses. `private: true` prevents accidental npm publication and does not change the source license.
 
-Saved ALLOW receipts that have not started become terminal DENIED when current rules
-require approval or deny. Same-key replay cannot revive them after relaxation.
-See [contract, concurrency boundary and migration steps](docs/policy-tightening.md).
+---
 
-## Phase E — Safe recovery
-
-Explicit `/v1/executions/:id/reconcile` and `/retry` preserve the operation key,
-use durable fake-provider receipts and fence stale attempt completions. New
-executions have at most three attempts; old executions are not silently upgraded.
-OWNER-only reconciliation remains available when an agent is suspended. No
-background retry worker or real provider is introduced.
-See [contract, architecture, Windows steps and limits](docs/phase-e-safe-execution.md)
-and [Postman collection](docs/AgentGate-Phase-E.postman_collection.json).
-
-## Phase F — Stateful daily refund budget
-
-Optional server-configured budgets reserve daily USD capacity atomically with
-execution admission. Confirmed success consumes, definite failure releases, and
-unknown outcomes retain the hold. Retries reuse the original reservation; approval
-never bypasses the cap. UTC first-dispatch day and environment define the scope.
-Members can inspect aggregate usage through the JWT monitoring endpoint.
-See [configuration, rollout, semantics and Windows tests](docs/phase-f-daily-refund-budget.md)
-and [Postman collection](docs/AgentGate-Phase-F.postman_collection.json).
-
-## Phases G/H — Observe, simulate and connect MCP
-
-`POST /v1/actions/observe` records a policy-only would-decision without executing.
-OWNER historical simulations test candidate rules without installing them or
-modifying execution evidence. Member monitoring returns redacted study metadata.
-See [Phase G](docs/phase-g-observation-simulation.md) and its
-[Postman collection](docs/AgentGate-Phase-G.postman_collection.json).
-
-The local stdio MCP adapter exposes six tools through the same authenticated HTTP
-API: refund_create, refund_observe, execution_get, execution_resume, execution_retry
-and execution_reconcile. It has no direct provider or database access and cannot
-approve requests. See [setup and security boundaries](docs/phase-h-mcp-adapter.md).
-
-The initial A–H vertical slice is complete within the Fake Commerce scope. See
-[implemented capabilities, deferred work and combined teaching plan](docs/project-roadmap-status.md).
-
-## License and security
-
-AgentGate source is available under the [MIT License](LICENSE), copyright 2026
-Saeed Allam. Third-party dependencies retain their own licenses. The package stays
-`private: true` to prevent accidental npm publication; this does not change the
-source license or prevent running a hosted service.
-
-Read [SECURITY.md](SECURITY.md) for reporting guidance and support boundaries.
+<p align="center">
+  <img src="public/console/logo.svg" width="28" alt="AgentGate" /><br />
+  <strong>A little freedom. A lot of control.</strong>
+</p>

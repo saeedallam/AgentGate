@@ -28,8 +28,9 @@ future product ideas or production rollout requirements are complete.
 - General action/API rate limits, suspend/revoke administration endpoints, broader
   audit trail, automatic recovery/cleanup workers, approval expiry, velocity limits,
   total cross-day exposure limits and a production console remain future work.
-- The existing UI prototype is separate from this backend task. No real payment,
-  email, cloud deployment, billing or production-readiness claim is introduced.
+- The English Hive console is connected to the backend for monitoring, approvals
+  and protected action flows. The earlier hosted prototype remains separate. No
+  real payment, email, cloud deployment, billing or production-readiness claim is introduced.
 
 ## Combined teaching order
 
