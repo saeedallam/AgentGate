@@ -229,3 +229,18 @@ The console language is English with LTR layout, as explicitly requested. Follow
 the original AgentGate Hive demo identity (hexagonal G, honey, forest green,
 white sidebar, DM Sans and Manrope), while retaining real backend data and
 working approval flows rather than the demo's sample records or obsolete labels.
+
+
+## Operational review follow-up (2026-10-18)
+
+The user authorized all applicable review fixes. The operational hardening guide
+supersedes historical deferred-control statements above. Preserve canonical v2
+policy hash versions and immutable v1 history. Registry instances are module
+providers. Shared PostgreSQL admission counters scope organization/agent, not keys.
+OWNER suspension/revocation serialize with claims through agent row locks; already
+claimed work may finish. Receipt/approval deadlines expire first-dispatch authority
+without rewriting final decisions or releasing unknown budget holds. Sensitive
+human detail reads await identifier-only audit insertion. Existing daily caps stay
+active after config changes; new caps apply to newly opened UTC-day buckets.
+MCP creation uses a host-persisted operation UUID, never a model-selected key.
+See docs/operational-hardening.md for the breaking MCP schema and migration behavior.

@@ -25,7 +25,7 @@ model User {
   createdAt    DateTime @default(now()) @db.Timestamptz(3)
   updatedAt    DateTime @updatedAt @db.Timestamptz(3)
 
-  policyStudies PolicyStudy[]
+  policyStudies     PolicyStudy[]
   memberships       OrganizationMember[]
   approvalDecisions Approval[]
 }
@@ -51,11 +51,11 @@ model Organization {
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
-  members      OrganizationMember[]
-  agents       Agent[]
-  fakePayments FakePayment[]
+  members             OrganizationMember[]
+  agents              Agent[]
+  fakePayments        FakePayment[]
   refundBudgetBuckets RefundBudgetBucket[]
-  policyStudies PolicyStudy[]
+  policyStudies       PolicyStudy[]
 }
 
 model OrganizationMember {
@@ -80,9 +80,9 @@ model Agent {
   createdAt      DateTime    @default(now()) @db.Timestamptz(3)
   updatedAt      DateTime    @updatedAt @db.Timestamptz(3)
 
-  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  credentials  AgentCredential[]
-  executions   Execution[]
+  organization  Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  credentials   AgentCredential[]
+  executions    Execution[]
   policyStudies PolicyStudy[]
 
   @@unique([organizationId, name])
@@ -110,26 +110,28 @@ enum PolicyDecision {
 }
 
 model Execution {
-  recoveryVersion Int @default(0)
-  attemptCount Int @default(0)
-  leaseExpiresAt DateTime? @db.Timestamptz(3)
-  nextRetryAt DateTime? @db.Timestamptz(3)
-  providerReceipt FakeProviderReceipt?
+  expiresAt               DateTime                 @default(dbgenerated("(CURRENT_TIMESTAMP + '24 hours'::interval)")) @db.Timestamptz(3)
+  policyHashVersion       Int                      @default(1)
+  recoveryVersion         Int                      @default(0)
+  attemptCount            Int                      @default(0)
+  leaseExpiresAt          DateTime?                @db.Timestamptz(3)
+  nextRetryAt             DateTime?                @db.Timestamptz(3)
+  providerReceipt         FakeProviderReceipt?
   refundBudgetReservation RefundBudgetReservation?
-  blockedPolicyDecision PolicyDecision?
-  blockedPolicyHash String? @db.VarChar(64)
-  blockedAt DateTime? @db.Timestamptz(3)
-  policyDecision    PolicyDecision?
-  policyReason      String?            @db.VarChar(100)
-  policyHash        String?            @db.VarChar(64)
-  policyEvaluatedAt DateTime?          @db.Timestamptz(3)
-  idempotencyKey    String?            @db.VarChar(128)
-  requestHash       String?            @db.VarChar(64)
-  attempts          ExecutionAttempt[]
-  approval          Approval?
-  id                String             @id @default(uuid()) @db.Uuid
-  organizationId    String             @db.Uuid
-  agentId           String             @db.Uuid
+  blockedPolicyDecision   PolicyDecision?
+  blockedPolicyHash       String?                  @db.VarChar(64)
+  blockedAt               DateTime?                @db.Timestamptz(3)
+  policyDecision          PolicyDecision?
+  policyReason            String?                  @db.VarChar(100)
+  policyHash              String?                  @db.VarChar(64)
+  policyEvaluatedAt       DateTime?                @db.Timestamptz(3)
+  idempotencyKey          String?                  @db.VarChar(128)
+  requestHash             String?                  @db.VarChar(64)
+  attempts                ExecutionAttempt[]
+  approval                Approval?
+  id                      String                   @id @default(uuid()) @db.Uuid
+  organizationId          String                   @db.Uuid
+  agentId                 String                   @db.Uuid
 
   actionName String @db.VarChar(100)
   arguments  Json   @db.JsonB
@@ -155,18 +157,19 @@ model Execution {
 }
 
 model ExecutionAttempt {
-  id             String          @id @default(uuid()) @db.Uuid
-  organizationId String          @db.Uuid
-  executionId    String          @db.Uuid
-  attemptNumber Int @default(1)
-  resolvedAt DateTime? @db.Timestamptz(3)
+  id             String           @id @default(uuid()) @db.Uuid
+  organizationId String           @db.Uuid
+  executionId    String           @db.Uuid
+  attemptNumber  Int              @default(1)
+  resolvedAt     DateTime?        @db.Timestamptz(3)
   resolvedStatus ExecutionStatus?
-  credentialId   String          @db.Uuid
-  status         ExecutionStatus @default(EXECUTING)
-  startedAt      DateTime        @default(now()) @db.Timestamptz(3)
-  finishedAt     DateTime?       @db.Timestamptz(3)
-  errorCode      String?         @db.VarChar(100)
-  execution      Execution       @relation(fields: [organizationId, executionId], references: [organizationId, id], onDelete: Restrict, onUpdate: Restrict)
+  credentialId   String           @db.Uuid
+  status         ExecutionStatus  @default(EXECUTING)
+  startedAt      DateTime         @default(now()) @db.Timestamptz(3)
+  finishedAt     DateTime?        @db.Timestamptz(3)
+  errorCode      String?          @db.VarChar(100)
+  execution      Execution        @relation(fields: [organizationId, executionId], references: [organizationId, id], onDelete: Restrict, onUpdate: Restrict)
+
   @@unique([executionId, attemptNumber])
 }
 
@@ -190,6 +193,7 @@ enum ApprovalStatus {
 }
 
 model Approval {
+  expiresAt       DateTime       @default(dbgenerated("(CURRENT_TIMESTAMP + '24 hours'::interval)")) @db.Timestamptz(3)
   id              String         @id @default(uuid()) @db.Uuid
   organizationId  String         @db.Uuid
   executionId     String         @unique @db.Uuid
@@ -210,26 +214,28 @@ model Approval {
 
 // Fake provider-owned journal. Its commit is atomic with the simulated effect.
 model FakeProviderReceipt {
-  executionId String @id @db.Uuid
-  organizationId String @db.Uuid
-  requestHash String @db.VarChar(64)
-  outcome Json? @db.JsonB
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
-  execution Execution @relation(fields: [organizationId, executionId], references: [organizationId, id], onDelete: Cascade, onUpdate: Restrict)
+  executionId    String    @id @db.Uuid
+  organizationId String    @db.Uuid
+  requestHash    String    @db.VarChar(64)
+  outcome        Json?     @db.JsonB
+  createdAt      DateTime  @default(now()) @db.Timestamptz(3)
+  execution      Execution @relation(fields: [organizationId, executionId], references: [organizationId, id], onDelete: Cascade, onUpdate: Restrict)
+
   @@unique([organizationId, executionId])
 }
 
 // Scope is organization + execution environment + currency + first-dispatch UTC day.
 model RefundBudgetBucket {
-  organizationId String @db.Uuid
-  environment ExecutionEnvironment
-  currency String @db.VarChar(3)
-  day DateTime @db.Date
-  limitMinor Int
-  reservedMinor Int @default(0)
-  consumedMinor Int @default(0)
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  reservations RefundBudgetReservation[]
+  organizationId String                    @db.Uuid
+  environment    ExecutionEnvironment
+  currency       String                    @db.VarChar(3)
+  day            DateTime                  @db.Date
+  limitMinor     Int
+  reservedMinor  Int                       @default(0)
+  consumedMinor  Int                       @default(0)
+  organization   Organization              @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  reservations   RefundBudgetReservation[]
+
   @@id([organizationId, environment, currency, day])
 }
 
@@ -240,17 +246,18 @@ enum RefundReservationStatus {
 }
 
 model RefundBudgetReservation {
-  executionId String @id @db.Uuid
-  organizationId String @db.Uuid
-  environment ExecutionEnvironment
-  currency String @db.VarChar(3)
-  day DateTime @db.Date
-  amountMinor Int
-  status RefundReservationStatus @default(HELD)
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
-  settledAt DateTime? @db.Timestamptz(3)
-  execution Execution @relation(fields: [organizationId, executionId], references: [organizationId, id], onDelete: Restrict, onUpdate: Restrict)
-  bucket RefundBudgetBucket @relation(fields: [organizationId, environment, currency, day], references: [organizationId, environment, currency, day], onDelete: Restrict, onUpdate: Restrict)
+  executionId    String                  @id @db.Uuid
+  organizationId String                  @db.Uuid
+  environment    ExecutionEnvironment
+  currency       String                  @db.VarChar(3)
+  day            DateTime                @db.Date
+  amountMinor    Int
+  status         RefundReservationStatus @default(HELD)
+  createdAt      DateTime                @default(now()) @db.Timestamptz(3)
+  settledAt      DateTime?               @db.Timestamptz(3)
+  execution      Execution               @relation(fields: [organizationId, executionId], references: [organizationId, id], onDelete: Restrict, onUpdate: Restrict)
+  bucket         RefundBudgetBucket      @relation(fields: [organizationId, environment, currency, day], references: [organizationId, environment, currency, day], onDelete: Restrict, onUpdate: Restrict)
+
   @@unique([organizationId, executionId])
   @@index([organizationId, environment, currency, day])
 }
@@ -260,20 +267,42 @@ enum PolicyStudyMode {
   OBSERVE
   SIMULATE
 }
+
 model PolicyStudy {
-  id String @id @default(uuid()) @db.Uuid
-  organizationId String @db.Uuid
-  agentId String? @db.Uuid
-  userId String? @db.Uuid
-  mode PolicyStudyMode
-  policyHash String @db.VarChar(64)
-  summary Json @db.JsonB
-  results Json @db.JsonB
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
-  expiresAt DateTime @db.Timestamptz(3)
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  agent Agent? @relation(fields: [organizationId, agentId], references: [organizationId, id], onDelete: Restrict, onUpdate: Restrict)
-  user User? @relation(fields: [userId], references: [id], onDelete: Restrict)
+  policyHashVersion Int             @default(1)
+  id                String          @id @default(uuid()) @db.Uuid
+  organizationId    String          @db.Uuid
+  agentId           String?         @db.Uuid
+  userId            String?         @db.Uuid
+  mode              PolicyStudyMode
+  policyHash        String          @db.VarChar(64)
+  summary           Json            @db.JsonB
+  results           Json            @db.JsonB
+  createdAt         DateTime        @default(now()) @db.Timestamptz(3)
+  expiresAt         DateTime        @db.Timestamptz(3)
+  organization      Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  agent             Agent?          @relation(fields: [organizationId, agentId], references: [organizationId, id], onDelete: Restrict, onUpdate: Restrict)
+  user              User?           @relation(fields: [userId], references: [id], onDelete: Restrict)
+
   @@index([organizationId, createdAt, id])
   @@index([expiresAt])
+}
+
+// Bounded fixed-window counters shared by all server instances. No tokens/payloads.
+model RequestRateWindow {
+  key         String   @id @db.VarChar(180)
+  windowStart DateTime @db.Timestamptz(3)
+  count       Int
+}
+
+// Identifier-only access/control evidence; no arguments, results or credentials.
+model SecurityAuditEvent {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  actorUserId    String   @db.Uuid
+  targetId       String   @db.Uuid
+  event          String   @db.VarChar(64)
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([organizationId, createdAt, id])
 }

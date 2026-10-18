@@ -59,5 +59,8 @@ jobs:
           test/observations.integration.cjs
           test/mcp-flow.integration.cjs
           test/console-monitoring.integration.cjs
+          test/operational-controls.integration.cjs
+          test/rate-concurrency.integration.cjs
+          test/control-claim-concurrency.integration.cjs
       - name: Verify Docker packaging
         run: docker build --tag agentgate:ci .

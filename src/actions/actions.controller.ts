@@ -1,54 +1,95 @@
-import { Body, Controller, Get, Header, Headers, HttpCode, Param, ParseUUIDPipe, Post, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
-import { AgentAuthGuard } from '../agent-credentials/agent-auth.guard.js';
-import type { AgentAuthenticatedRequest } from '../agent-credentials/agent-authenticated-request.js';
-import { ExecutionsService } from '../executions/executions.service.js';
-import { ActionsService } from './actions.service.js';
+import { ActionRateGuard } from "../security/action-rate.guard.js";
+import {
+  Body,
+  Controller,
+  Get,
+  Header,
+  Headers,
+  HttpCode,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Req,
+  UnauthorizedException,
+  UseGuards,
+} from "@nestjs/common";
+import { AgentAuthGuard } from "../agent-credentials/agent-auth.guard.js";
+import type { AgentAuthenticatedRequest } from "../agent-credentials/agent-authenticated-request.js";
+import { ExecutionsService } from "../executions/executions.service.js";
+import { ActionsService } from "./actions.service.js";
 
-@Controller('v1')
+@Controller("v1")
 @UseGuards(AgentAuthGuard)
 export class ActionsController {
-  constructor(private readonly actions: ActionsService, private readonly executions: ExecutionsService) {}
+  constructor(
+    private readonly actions: ActionsService,
+    private readonly executions: ExecutionsService,
+  ) {}
 
-  @Post('actions')
+  @Post("actions")
+  @UseGuards(ActionRateGuard)
   @HttpCode(200)
-  @Header('Cache-Control', 'no-store')
-  submit(@Req() request: AgentAuthenticatedRequest, @Body() body: unknown,
-    @Headers('idempotency-key') key: unknown) {
-    if (!request.agent) throw new UnauthorizedException('Authentication required');
+  @Header("Cache-Control", "no-store")
+  submit(
+    @Req() request: AgentAuthenticatedRequest,
+    @Body() body: unknown,
+    @Headers("idempotency-key") key: unknown,
+  ) {
+    if (!request.agent)
+      throw new UnauthorizedException("Authentication required");
     return this.actions.submit(request.agent, body, key);
   }
 
-  @Post('executions/:id/resume')
+  @Post("executions/:id/resume")
+  @UseGuards(ActionRateGuard)
   @HttpCode(200)
-  @Header('Cache-Control', 'no-store')
-  resume(@Req() request: AgentAuthenticatedRequest,
-    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string, @Body() body: unknown) {
-    if (!request.agent) throw new UnauthorizedException('Authentication required');
+  @Header("Cache-Control", "no-store")
+  resume(
+    @Req() request: AgentAuthenticatedRequest,
+    @Param("id", new ParseUUIDPipe({ version: "4" })) id: string,
+    @Body() body: unknown,
+  ) {
+    if (!request.agent)
+      throw new UnauthorizedException("Authentication required");
     return this.actions.resume(request.agent, id, body);
   }
 
-  @Post('executions/:id/reconcile')
+  @Post("executions/:id/reconcile")
+  @UseGuards(ActionRateGuard)
   @HttpCode(200)
-  @Header('Cache-Control', 'no-store')
-  reconcile(@Req() request: AgentAuthenticatedRequest,
-    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string, @Body() body: unknown) {
-    if (!request.agent) throw new UnauthorizedException('Authentication required');
+  @Header("Cache-Control", "no-store")
+  reconcile(
+    @Req() request: AgentAuthenticatedRequest,
+    @Param("id", new ParseUUIDPipe({ version: "4" })) id: string,
+    @Body() body: unknown,
+  ) {
+    if (!request.agent)
+      throw new UnauthorizedException("Authentication required");
     return this.actions.reconcile(request.agent, id, body);
   }
 
-  @Post('executions/:id/retry')
+  @Post("executions/:id/retry")
+  @UseGuards(ActionRateGuard)
   @HttpCode(200)
-  @Header('Cache-Control', 'no-store')
-  retry(@Req() request: AgentAuthenticatedRequest,
-    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string, @Body() body: unknown) {
-    if (!request.agent) throw new UnauthorizedException('Authentication required');
+  @Header("Cache-Control", "no-store")
+  retry(
+    @Req() request: AgentAuthenticatedRequest,
+    @Param("id", new ParseUUIDPipe({ version: "4" })) id: string,
+    @Body() body: unknown,
+  ) {
+    if (!request.agent)
+      throw new UnauthorizedException("Authentication required");
     return this.actions.retry(request.agent, id, body);
   }
 
-  @Get('executions/:id')
-  @Header('Cache-Control', 'no-store')
-  get(@Req() request: AgentAuthenticatedRequest, @Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
-    if (!request.agent) throw new UnauthorizedException('Authentication required');
+  @Get("executions/:id")
+  @Header("Cache-Control", "no-store")
+  get(
+    @Req() request: AgentAuthenticatedRequest,
+    @Param("id", new ParseUUIDPipe({ version: "4" })) id: string,
+  ) {
+    if (!request.agent)
+      throw new UnauthorizedException("Authentication required");
     return this.executions.get(request.agent, id);
   }
 }

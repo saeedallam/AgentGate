@@ -1,3 +1,5 @@
+> Update: `refund_create` no longer accepts model-selected idempotency keys. The host must persist and configure `AGENTGATE_OPERATION_ID`. See [the operational upgrade](operational-hardening.md#mcp-host-owned-operation-identity-breaking-tool-schema-change).
+
 # Phase H — local stdio MCP adapter
 
 The adapter uses the official `@modelcontextprotocol/sdk` 1.32.1. It implements MCP
@@ -12,7 +14,7 @@ Official transport/tool reference: https://ts.sdk.modelcontextprotocol.io/server
 
 | MCP tool | Existing API path | Effect |
 | --- | --- | --- |
-| refund_create | POST /v1/actions | Propose the refund, with a required explicit idempotencyKey |
+| refund_create | POST /v1/actions | Propose the refund under the host-configured operation UUID |
 | refund_observe | POST /v1/actions/observe | Persist a non-executing policy preview |
 | execution_get | GET /v1/executions/:id | Read own execution |
 | execution_resume | POST /v1/executions/:id/resume | Resume exact approved action under current controls |
@@ -25,7 +27,9 @@ backend authenticates the configured agent key again on **every call**, so a run
 adapter does not preserve authority after revocation/suspension. Listing tool schemas
 is not authorization to execute them.
 
-The refund amount is USD cents. The host must keep one idempotency key per intent.
+The refund amount is USD cents. The host must persist one operation UUID per intent, and reuse it on adapter restart.
+The tool schema has no key field. A new creation intent requires a new host-configured
+process; observation and existing-execution tools need no operation UUID.
 Do not generate a new key because a reply was lost. Approval-required, denied,
 budget-exceeded and auth errors remain tool errors with backend safe response data.
 The adapter never auto-approves or automatically retries. Tool annotations describe
@@ -44,7 +48,8 @@ build, migrate and start the regular API first. For a host that supports stdio M
       "args": ["C:/projects/agentgate/dist/mcp/main.js"],
       "env": {
         "AGENTGATE_URL": "http://127.0.0.1:3000",
-        "AGENTGATE_API_KEY": "YOUR_AGENT_API_KEY"
+        "AGENTGATE_API_KEY": "YOUR_AGENT_API_KEY",
+        "AGENTGATE_OPERATION_ID": "YOUR_HOST_PERSISTED_OPERATION_UUID"
       }
     }
   }

@@ -33,7 +33,7 @@ export default function create(context) {
 <code>${e(a.actionName)}</code>
 <small class="mono">${e(shortId(a.id))}</small>
 </td>
-<td>${badge(a.status)}</td>
+<td>${badge(a.expired ? "EXPIRED" : a.status)}</td>
 <td>${badge(a.executionStatus)}</td>
 <td>${e(date(a.createdAt))}</td>
 <td>${btn(owner() ? "Review request" : "View summary", "approval", "compact", `data-id="${e(a.id)}"`)}</td>

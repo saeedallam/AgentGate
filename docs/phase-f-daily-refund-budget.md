@@ -1,3 +1,5 @@
+> Update: a changed configuration now leaves today’s recorded cap in force instead of blocking all new reservations. The new cap applies to the next newly opened UTC-day bucket. See [operational hardening](operational-hardening.md#mid-day-budget-changes).
+
 # Phase F — Daily refund budget
 
 Implemented slice: one server-configured USD refund budget per organization and
@@ -49,7 +51,7 @@ organization/environment scopes explicitly. Development and staging do not share
 capacity.
 
 The first successful reservation opens the day's bucket and freezes its cap.
-Changing the configured amount mid-day returns `BUDGET_CONFIGURATION_CHANGED`;
+Changing the configured amount mid-day keeps today’s recorded cap active;
 restore the original amount or deploy the new amount for the next UTC day.
 Removing the config does not bypass a bucket already opened today; future days
 without a rule have no budget. This is operator configuration, not a client override.

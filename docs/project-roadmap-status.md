@@ -25,8 +25,7 @@ future product ideas or production rollout requirements are complete.
 - Observation/simulation is policy-only and never disables live enforcement.
 - Policies and budget rules are server-owned startup configuration, not DB policy
   editing. All serving nodes must share compatible snapshots/version.
-- General action/API rate limits, suspend/revoke administration endpoints, broader
-  audit trail, automatic recovery/cleanup workers, approval expiry, velocity limits,
+- Broader audit trail, automatic recovery/cleanup workers, velocity limits,
   total cross-day exposure limits and a production console remain future work.
 - The English Hive console is connected to the backend for monitoring, approvals
   and protected action flows. The earlier hosted prototype remains separate. No
@@ -44,3 +43,5 @@ The learner requested implementation first and a joint explanation afterward:
 7. Read representative tests and explain what each failure would mean.
 
 Keep explanations and exercises separate from claims of learner understanding.
+
+Operational controls now include shared action/observation limits, OWNER suspend/revoke endpoints, immutable 24-hour first-dispatch deadlines and sensitive-read audit. See [the upgrade guide](operational-hardening.md).

@@ -214,7 +214,7 @@ Deliberate boundaries today:
 - **Explicit recovery**, not an automatic retry worker. New supported executions have at most three numbered attempts; legacy records are not silently upgraded.
 - **Server-configured policies and budgets**, not a policy-management UI. Serving nodes must use compatible snapshots.
 - **Local stdio MCP**, not a public remote MCP service. MCP cannot approve requests or bypass the HTTP API.
-- General action rate limits, suspend/revoke administration endpoints, approval expiry, broader audit capabilities and production operations remain future work.
+- Shared action/observation rate limits, OWNER suspend/revoke endpoints, first-dispatch/approval deadlines and sensitive-read audit are implemented. Broader audit capabilities and production operations remain future work.
 
 See the [roadmap status](docs/project-roadmap-status.md) for the full boundary between implemented features and plans.
 
@@ -230,3 +230,9 @@ AgentGate is licensed under **[MIT](LICENSE)**. Copyright © 2026 Saeed Allam. D
   <img src="public/console/logo.svg" width="28" alt="AgentGate" /><br />
   <strong>A little freedom. A lot of control.</strong>
 </p>
+
+## Operational controls
+
+See [Operational hardening](docs/operational-hardening.md) for suspension/revocation,
+shared action limits, 24-hour first-dispatch deadlines, sensitive-read audit,
+next-day budget changes and the host-owned MCP operation UUID upgrade.

@@ -1,63 +1,277 @@
-require('reflect-metadata');
-const {test}=require('node:test');const assert=require('node:assert/strict');const {randomUUID,randomBytes}=require('node:crypto');
-const {Client}=require('@modelcontextprotocol/sdk/client/index.js');const {StdioClientTransport}=require('@modelcontextprotocol/sdk/client/stdio.js');
-const url=process.env.TEST_DATABASE_URL;
-if(!url||new URL(url).pathname!=='/agentgate_test')throw new Error('TEST_DATABASE_URL must target agentgate_test');
-const org=randomUUID(),foreign=randomUUID(),owner=randomUUID();
-Object.assign(process.env,{DATABASE_URL:url,NODE_ENV:'test',LOG_LEVEL:'silent',JWT_ACCESS_SECRET:randomBytes(32).toString('hex'),POLICY_RULES_JSON:'[]',REFUND_BUDGETS_JSON:JSON.stringify([{organizationId:org,environment:'development',currency:'USD',limitMinor:10000}]),ACTION_ENVIRONMENT:'development',FAKE_EXECUTION_ENABLED:'true',FAKE_COMMERCE_SCENARIO:'success'});
-const {createApplication}=require('../dist/bootstrap.js');const {PrismaService}=require('../dist/infrastructure/database/prisma.service.js');
-const {AgentKeyService}=require('../dist/agent-credentials/agent-key.service.js');const {PolicyStore}=require('../dist/policies/policy-store.js');const {ConfigService}=require('@nestjs/config');const {JwtService}=require('@nestjs/jwt');
-
-test('stdio MCP completes the protected HTTP journey without bypassing policy, approval, budgets or tenant boundaries', {timeout:45000}, async()=>{
- const app=await createApplication(),db=app.get(PrismaService),config=app.get(ConfigService),scope={organizationId:{in:[org,foreign]}};
- const client=new Client({name:'integration-test',version:'1.0.0'});let transport,stderr='',policy='DENY';
- try{
-  await app.listen(0,'127.0.0.1');
-  app.get(PolicyStore).forOrganization=organizationId=>[{organizationId,actionName:'refund.create',effect:policy,conditions:[]}];
-  for(const organizationId of [org,foreign])await db.organization.create({data:{id:organizationId,name:'MCP lab'}});
-  const agent=await db.agent.create({data:{organizationId:org,name:'mcp-agent'}}),other=await db.agent.create({data:{organizationId:foreign,name:'other'}});
-  const key=app.get(AgentKeyService).generate();const credential=await db.agentCredential.create({data:{organizationId:org,agentId:agent.id,keyPrefix:key.keyPrefix,keyHash:key.keyHash}});
-  await db.user.create({data:{id:owner,email:owner+'@example.test',passwordHash:'unused'}});await db.organizationMember.create({data:{organizationId:org,userId:owner,role:'OWNER'}});
-  transport=new StdioClientTransport({command:process.execPath,args:['dist/mcp/main.js'],cwd:process.cwd(),env:{AGENTGATE_URL:await app.getUrl(),AGENTGATE_API_KEY:key.apiKey},stderr:'pipe'});
-  transport.stderr?.on('data',chunk=>{stderr+=chunk.toString();});await client.connect(transport);
-  assert.equal((await client.listTools()).tools.length,6);
-  const call=(name,args)=>client.callTool({name,arguments:args});
-  const args={paymentId:'mcp-success',amountMinor:1000,currency:'USD',idempotencyKey:'mcp-denied'};
-  let r=await call('refund_observe',{paymentId:args.paymentId,amountMinor:args.amountMinor,currency:'USD'});
-  assert.equal(r.structuredContent.result.executed,false);assert.equal(r.structuredContent.result.results[0].decision,'DENY');
-  assert.equal(await db.execution.count({where:scope}),0);
-  r=await call('refund_create',args);assert.equal(r.isError,true);assert.equal(r.structuredContent.result.code,'POLICY_DENIED');
-  policy='ALLOW';r=await call('refund_create',args);assert.equal(r.structuredContent.result.code,'POLICY_DENIED');
-  for(const id of ['mcp-success','mcp-approval','mcp-unknown','mcp-over-budget'])await db.fakePayment.create({data:{organizationId:org,id,amountMinor:100000}});
-  const allowed={...args,idempotencyKey:'mcp-allowed'};
-  r=await call('refund_create',allowed);assert.equal(r.isError,undefined);const e=r.structuredContent.result;assert.equal(e.status,'SUCCEEDED');
-  r=await call('refund_create',allowed);assert.equal(r.structuredContent.result.id,e.id);assert.equal(r.structuredContent.result.attempts.length,1);
-  r=await call('refund_create',{...allowed,amountMinor:2000});assert.equal(r.isError,true);assert.equal(r.structuredContent.statusCode,409);
-  r=await call('refund_create',{...allowed,organizationId:foreign});assert.equal(r.isError,true);
-  const outsider=await db.execution.create({data:{organizationId:foreign,agentId:other.id,actionName:'refund.create',arguments:{},environment:'development',requestedAt:new Date()}});
-  r=await call('execution_get',{executionId:outsider.id});assert.equal(r.structuredContent.statusCode,404);
-  policy='REQUIRE_APPROVAL';r=await call('refund_create',{...allowed,paymentId:'mcp-approval',idempotencyKey:'approval'});
-  const approval=r.structuredContent.result;assert.equal(approval.approvalStatus,'PENDING');
-  r=await call('execution_resume',{executionId:approval.executionId});assert.equal(r.structuredContent.statusCode,403);
-  const jwt=await app.get(JwtService).signAsync({sub:owner});
-  const decision=await app.inject({method:'POST',url:'/v1/approvals/'+approval.approvalId+'/decision',headers:{authorization:'Bearer '+jwt},payload:{decision:'APPROVED'}});assert.equal(decision.statusCode,200,decision.body);
-  r=await call('execution_resume',{executionId:approval.executionId,amountMinor:999});assert.equal(r.isError,true);
-  r=await call('execution_resume',{executionId:approval.executionId});assert.equal(r.structuredContent.result.status,'SUCCEEDED');
-  policy='ALLOW';config.set('FAKE_COMMERCE_SCENARIO','unknown');
-  r=await call('refund_create',{...allowed,paymentId:'mcp-unknown',idempotencyKey:'unknown'});const unknown=r.structuredContent.result;assert.equal(unknown.status,'OUTCOME_UNKNOWN');
-  r=await call('execution_reconcile',{executionId:unknown.id});assert.equal(r.structuredContent.result.status,'SUCCEEDED');
-  r=await call('execution_retry',{executionId:unknown.id});assert.equal(r.structuredContent.result.attempts.length,1);
-  config.set('FAKE_COMMERCE_SCENARIO','success');
-  r=await call('refund_create',{...allowed,paymentId:'mcp-over-budget',amountMinor:8000,idempotencyKey:'over-budget'});
-  assert.equal(r.structuredContent.result.code,'DAILY_REFUND_BUDGET_EXCEEDED');
-  assert.equal((await db.refundBudgetBucket.findFirstOrThrow({where:{organizationId:org}})).consumedMinor,3000);
-  assert.equal((await db.fakePayment.findUniqueOrThrow({where:{organizationId_id:{organizationId:org,id:'mcp-over-budget'}}})).refunded,false);
-  await db.agentCredential.update({where:{id:credential.id},data:{revokedAt:new Date()}});
-  r=await call('execution_get',{executionId:e.id});assert.equal(r.structuredContent.statusCode,401);
-  assert.equal(stderr.includes(key.apiKey),false);assert.equal(stderr.includes(jwt),false);
- }finally{
-  await client.close();if(transport)await transport.close();
-  await db.$transaction([db.policyStudy.deleteMany({where:scope}),db.refundBudgetReservation.deleteMany({where:scope}),db.refundBudgetBucket.deleteMany({where:scope}),db.fakePayment.deleteMany({where:scope}),db.executionAttempt.deleteMany({where:scope}),db.approval.deleteMany({where:scope}),db.execution.deleteMany({where:scope}),db.agentCredential.deleteMany({where:scope}),db.agent.deleteMany({where:scope}),db.organizationMember.deleteMany({where:scope}),db.organization.deleteMany({where:{id:{in:[org,foreign]}}}),db.user.deleteMany({where:{id:owner}})]);
-  await app.close();
- }
+require("reflect-metadata");
+const { test } = require("node:test");
+const assert = require("node:assert/strict");
+const { randomUUID, randomBytes } = require("node:crypto");
+const { Client } = require("@modelcontextprotocol/sdk/client/index.js");
+const {
+  StdioClientTransport,
+} = require("@modelcontextprotocol/sdk/client/stdio.js");
+const url = process.env.TEST_DATABASE_URL;
+if (!url || new URL(url).pathname !== "/agentgate_test")
+  throw new Error("TEST_DATABASE_URL must target agentgate_test");
+const org = randomUUID(),
+  foreign = randomUUID(),
+  owner = randomUUID();
+Object.assign(process.env, {
+  DATABASE_URL: url,
+  NODE_ENV: "test",
+  LOG_LEVEL: "silent",
+  JWT_ACCESS_SECRET: randomBytes(32).toString("hex"),
+  POLICY_RULES_JSON: "[]",
+  REFUND_BUDGETS_JSON: JSON.stringify([
+    {
+      organizationId: org,
+      environment: "development",
+      currency: "USD",
+      limitMinor: 10000,
+    },
+  ]),
+  ACTION_ENVIRONMENT: "development",
+  FAKE_EXECUTION_ENABLED: "true",
+  FAKE_COMMERCE_SCENARIO: "success",
 });
+const { createApplication } = require("../dist/bootstrap.js");
+const {
+  PrismaService,
+} = require("../dist/infrastructure/database/prisma.service.js");
+const {
+  AgentKeyService,
+} = require("../dist/agent-credentials/agent-key.service.js");
+const { PolicyStore } = require("../dist/policies/policy-store.js");
+const { ConfigService } = require("@nestjs/config");
+const { JwtService } = require("@nestjs/jwt");
+
+test(
+  "stdio MCP completes the protected HTTP journey without bypassing policy, approval, budgets or tenant boundaries",
+  { timeout: 45000 },
+  async () => {
+    const app = await createApplication(),
+      db = app.get(PrismaService),
+      config = app.get(ConfigService),
+      scope = { organizationId: { in: [org, foreign] } };
+    let client = new Client({ name: "integration-test", version: "1.0.0" });
+    let operationId = randomUUID(),
+      transport,
+      stderr = "",
+      policy = "DENY";
+    try {
+      await app.listen(0, "127.0.0.1");
+      app.get(PolicyStore).forOrganization = (organizationId) => [
+        {
+          organizationId,
+          actionName: "refund.create",
+          effect: policy,
+          conditions: [],
+        },
+      ];
+      for (const organizationId of [org, foreign])
+        await db.organization.create({
+          data: { id: organizationId, name: "MCP lab" },
+        });
+      const agent = await db.agent.create({
+          data: { organizationId: org, name: "mcp-agent" },
+        }),
+        other = await db.agent.create({
+          data: { organizationId: foreign, name: "other" },
+        });
+      const key = app.get(AgentKeyService).generate();
+      const credential = await db.agentCredential.create({
+        data: {
+          organizationId: org,
+          agentId: agent.id,
+          keyPrefix: key.keyPrefix,
+          keyHash: key.keyHash,
+        },
+      });
+      await db.user.create({
+        data: {
+          id: owner,
+          email: owner + "@example.test",
+          passwordHash: "unused",
+        },
+      });
+      await db.organizationMember.create({
+        data: { organizationId: org, userId: owner, role: "OWNER" },
+      });
+      transport = new StdioClientTransport({
+        command: process.execPath,
+        args: ["dist/mcp/main.js"],
+        cwd: process.cwd(),
+        env: {
+          AGENTGATE_URL: await app.getUrl(),
+          AGENTGATE_API_KEY: key.apiKey,
+          AGENTGATE_OPERATION_ID: operationId,
+        },
+        stderr: "pipe",
+      });
+      transport.stderr?.on("data", (chunk) => {
+        stderr += chunk.toString();
+      });
+      await client.connect(transport);
+      assert.equal((await client.listTools()).tools.length, 6);
+      const nextOperation = async () => {
+        await client.close();
+        await transport.close();
+        operationId = randomUUID();
+        client = new Client({ name: "integration-test", version: "1.0.0" });
+        transport = new StdioClientTransport({
+          command: process.execPath,
+          args: ["dist/mcp/main.js"],
+          cwd: process.cwd(),
+          env: {
+            AGENTGATE_URL: await app.getUrl(),
+            AGENTGATE_API_KEY: key.apiKey,
+            AGENTGATE_OPERATION_ID: operationId,
+          },
+          stderr: "pipe",
+        });
+        await client.connect(transport);
+      };
+      const call = (name, args) => client.callTool({ name, arguments: args });
+      const args = {
+        paymentId: "mcp-success",
+        amountMinor: 1000,
+        currency: "USD",
+      };
+      let r = await call("refund_observe", {
+        paymentId: args.paymentId,
+        amountMinor: args.amountMinor,
+        currency: "USD",
+      });
+      assert.equal(r.structuredContent.result.executed, false);
+      assert.equal(r.structuredContent.result.results[0].decision, "DENY");
+      assert.equal(await db.execution.count({ where: scope }), 0);
+      r = await call("refund_create", args);
+      assert.equal(r.isError, true);
+      assert.equal(r.structuredContent.result.code, "POLICY_DENIED");
+      policy = "ALLOW";
+      r = await call("refund_create", args);
+      assert.equal(r.structuredContent.result.code, "POLICY_DENIED");
+      for (const id of [
+        "mcp-success",
+        "mcp-approval",
+        "mcp-unknown",
+        "mcp-over-budget",
+      ])
+        await db.fakePayment.create({
+          data: { organizationId: org, id, amountMinor: 100000 },
+        });
+      await nextOperation();
+      const allowed = { ...args };
+      r = await call("refund_create", allowed);
+      assert.equal(r.isError, undefined);
+      const e = r.structuredContent.result;
+      assert.equal(e.status, "SUCCEEDED");
+      r = await call("refund_create", allowed);
+      assert.equal(r.structuredContent.result.id, e.id);
+      assert.equal(r.structuredContent.result.attempts.length, 1);
+      r = await call("refund_create", { ...allowed, amountMinor: 2000 });
+      assert.equal(r.isError, true);
+      assert.equal(r.structuredContent.statusCode, 409);
+      r = await call("refund_create", { ...allowed, organizationId: foreign });
+      assert.equal(r.isError, true);
+      const outsider = await db.execution.create({
+        data: {
+          organizationId: foreign,
+          agentId: other.id,
+          actionName: "refund.create",
+          arguments: {},
+          environment: "development",
+          requestedAt: new Date(),
+        },
+      });
+      r = await call("execution_get", { executionId: outsider.id });
+      assert.equal(r.structuredContent.statusCode, 404);
+      await nextOperation();
+      policy = "REQUIRE_APPROVAL";
+      r = await call("refund_create", {
+        ...allowed,
+        paymentId: "mcp-approval",
+      });
+      const approval = r.structuredContent.result;
+      assert.equal(approval.approvalStatus, "PENDING");
+      r = await call("execution_resume", { executionId: approval.executionId });
+      assert.equal(r.structuredContent.statusCode, 403);
+      const jwt = await app.get(JwtService).signAsync({ sub: owner });
+      const decision = await app.inject({
+        method: "POST",
+        url: "/v1/approvals/" + approval.approvalId + "/decision",
+        headers: { authorization: "Bearer " + jwt },
+        payload: { decision: "APPROVED" },
+      });
+      assert.equal(decision.statusCode, 200, decision.body);
+      r = await call("execution_resume", {
+        executionId: approval.executionId,
+        amountMinor: 999,
+      });
+      assert.equal(r.isError, true);
+      r = await call("execution_resume", { executionId: approval.executionId });
+      assert.equal(r.structuredContent.result.status, "SUCCEEDED");
+      await nextOperation();
+      policy = "ALLOW";
+      config.set("FAKE_COMMERCE_SCENARIO", "unknown");
+      r = await call("refund_create", { ...allowed, paymentId: "mcp-unknown" });
+      const unknown = r.structuredContent.result;
+      assert.equal(unknown.status, "OUTCOME_UNKNOWN");
+      r = await call("execution_reconcile", { executionId: unknown.id });
+      assert.equal(r.structuredContent.result.status, "SUCCEEDED");
+      r = await call("execution_retry", { executionId: unknown.id });
+      assert.equal(r.structuredContent.result.attempts.length, 1);
+      await nextOperation();
+      config.set("FAKE_COMMERCE_SCENARIO", "success");
+      r = await call("refund_create", {
+        ...allowed,
+        paymentId: "mcp-over-budget",
+        amountMinor: 8000,
+      });
+      assert.equal(
+        r.structuredContent.result.code,
+        "DAILY_REFUND_BUDGET_EXCEEDED",
+      );
+      assert.equal(
+        (
+          await db.refundBudgetBucket.findFirstOrThrow({
+            where: { organizationId: org },
+          })
+        ).consumedMinor,
+        3000,
+      );
+      assert.equal(
+        (
+          await db.fakePayment.findUniqueOrThrow({
+            where: {
+              organizationId_id: { organizationId: org, id: "mcp-over-budget" },
+            },
+          })
+        ).refunded,
+        false,
+      );
+      await db.agentCredential.update({
+        where: { id: credential.id },
+        data: { revokedAt: new Date() },
+      });
+      r = await call("execution_get", { executionId: e.id });
+      assert.equal(r.structuredContent.statusCode, 401);
+      assert.equal(stderr.includes(key.apiKey), false);
+      assert.equal(stderr.includes(jwt), false);
+    } finally {
+      await client.close();
+      if (transport) await transport.close();
+      await db.$transaction([
+        db.policyStudy.deleteMany({ where: scope }),
+        db.refundBudgetReservation.deleteMany({ where: scope }),
+        db.refundBudgetBucket.deleteMany({ where: scope }),
+        db.fakePayment.deleteMany({ where: scope }),
+        db.executionAttempt.deleteMany({ where: scope }),
+        db.approval.deleteMany({ where: scope }),
+        db.execution.deleteMany({ where: scope }),
+        db.agentCredential.deleteMany({ where: scope }),
+        db.agent.deleteMany({ where: scope }),
+        db.organizationMember.deleteMany({ where: scope }),
+        db.organization.deleteMany({ where: { id: { in: [org, foreign] } } }),
+        db.user.deleteMany({ where: { id: owner } }),
+      ]);
+      await app.close();
+    }
+  },
+);

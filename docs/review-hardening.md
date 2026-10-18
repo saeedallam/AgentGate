@@ -49,7 +49,12 @@ embedded tests do not prove independent-connection race behavior.
 No migration or environment variable change is required. The rules for fake
 execution and configured daily budgets remain unchanged.
 
-## Still open from the review
+## Follow-up
+
+The items below were addressed by the next operational release; see
+[Operational hardening](operational-hardening.md) for exact contracts and limits.
+
+### Original follow-up list
 
 - Sensitive-read audit events across console and approval detail endpoints.
 - Action/observation rate limits with explicit agent/organization scopes.

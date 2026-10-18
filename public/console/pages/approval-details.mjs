@@ -6,7 +6,7 @@ export default function create(context) {
     modal(
       "Review approval",
       `<div class="row between">
-<code>${e(a.actionName)}</code>${badge(a.status)}</div>
+<code>${e(a.actionName)}</code>${badge(a.expired ? "EXPIRED" : a.status)}</div>
 <div class="detail-grid">
 <div>
 <span>Approval ID</span>
@@ -17,7 +17,7 @@ export default function create(context) {
 <div>
 <span>Execution status</span>${badge(a.executionStatus)}</div>
 <div>
-<span>Decided at</span>${e(date(a.decidedAt))}</div>
+<span>Expires at</span>${e(date(a.expiresAt))}${a.expired ? " — Expired" : ""}</div><div><span>Decided at</span>${e(date(a.decidedAt))}</div>
 </div>${
         a.request
           ? `<div class="notice">Review these values. Your decision binds to this stored action and cannot change once recorded.</div>${
@@ -30,7 +30,7 @@ export default function create(context) {
             }${json(a.request)}`
           : '<div class="notice">Action details are available to the owner only.</div>'
       }${
-        a.status === "PENDING" && owner() && a.request
+        a.status === "PENDING" && !a.expired && owner() && a.request
           ? `<form data-form="decision" data-id="${e(a.id)}" class="form">
 <label class="checkline">
 <input type="checkbox" required>I reviewed the action, values and organization. I understand the decision is final and approval does not execute the action automatically.</label>

@@ -207,3 +207,15 @@ license and package metadata agree. Dependency licenses remain separate. See
 - Native PostgreSQL races and the Docker image are verified separately by the Backend verification workflow for the published commit.
 
 See [console guide](console-guide.md) for startup, supported flows and limitations.
+
+
+## Operational review follow-up — 2026-10-18
+
+Local verification: 108 ordinary tests pass; build, ESLint and Prisma validation
+pass. The embedded PostgreSQL-compatible lab passes 16 integration cases, including
+expiry triggers, sensitive-read audit failure, owner disablement, separate shared
+rate scopes and mid-day/next-day cap behavior. Five final targeted HTTP/DOM tests
+also pass after the expiration display and singleton checks. Embedded execution is
+not evidence of independent native PostgreSQL races. The release workflow includes
+all existing native concurrency tests plus rate-slot and disablement/claim tests.
+See `docs/operational-hardening.md` for upgrade behavior and remaining boundaries.

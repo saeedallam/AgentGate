@@ -1,3 +1,4 @@
+import { recordSecurityEvent } from "../security/security-audit.js";
 import {
   BadRequestException,
   Injectable,
@@ -111,7 +112,12 @@ export class ConsoleService {
           },
         }),
         this.prisma.approval.count({
-          where: { organizationId, status: "PENDING", execution: scope },
+          where: {
+            organizationId,
+            status: "PENDING",
+            expiresAt: { gt: new Date() },
+            execution: scope,
+          },
         }),
         this.prisma.execution.findMany({
           where: scope,
@@ -179,6 +185,7 @@ export class ConsoleService {
       select: {
         ...executionSummary,
         requestedAt: true,
+        expiresAt: true,
         policyReason: true,
         policyEvaluatedAt: true,
         blockedPolicyDecision: true,
@@ -211,6 +218,14 @@ export class ConsoleService {
       },
     });
     if (!row) throw new NotFoundException("Execution not found");
+    if (owner)
+      await recordSecurityEvent(
+        this.prisma,
+        organizationId,
+        userId,
+        id,
+        "CONSOLE_SENSITIVE_READ",
+      );
     return row;
   }
 }

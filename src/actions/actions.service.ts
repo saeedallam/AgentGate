@@ -1,8 +1,16 @@
+import {
+  assertSnapshot,
+  assertNotDenied,
+  assertRecoveryInput,
+} from "./action-preconditions.js";
+import { assertUnexpired } from "../executions/execution-deadline.js";
+import { evaluatePolicy } from "../policies/evaluate-policy.js";
+import { requireApprovalBinding } from "./approval-gate.js";
 import type { ExecutionReader } from "../executions/execution-reader.js";
 import type { Execution } from "../generated/prisma/client.js";
 import { BLOCK_CODE } from "./action-block-code.js";
 import { blocked } from "./action-block.js";
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { PolicyStore } from "../policies/policy-store.js";
 import { PolicyEngine } from "../policies/policy-engine.js";
 import { retryWindow } from "../executions/recovery-contract.js";
@@ -37,6 +45,7 @@ export class ActionsService {
     private readonly config: ConfigService,
     private readonly policies: PolicyStore,
     private readonly policyEngine: PolicyEngine,
+    private readonly registry: ActionRegistry = new ActionRegistry(),
   ) {}
 
   async submit(identity: AuthenticatedAgent, input: unknown, key: unknown) {
@@ -50,7 +59,7 @@ export class ActionsService {
     if (!keyResult.success)
       throw new BadRequestException("Valid Idempotency-Key required");
     const factory = new ActionRequestFactory(
-      new ActionRegistry(),
+      this.registry,
       this.config.get<ActionEnvironment>("ACTION_ENVIRONMENT", "development"),
     );
     let request;
@@ -62,17 +71,19 @@ export class ActionsService {
       }
       throw error;
     }
-    const evaluate = () => this.evaluatePolicy(request);
+    const evaluate = () =>
+      evaluatePolicy(request, this.policies, this.policyEngine);
     const execution = await this.executions.receive(
       request,
       keyResult.data,
       evaluate,
     );
     // Replays report recorded outcomes; they never authorize a fresh dispatch.
-    this.assertNotDenied(execution);
+    assertNotDenied(execution);
+    assertUnexpired(execution);
     if (execution.status !== "RECEIVED")
       return this.readExecution(identity, execution.id);
-    const savedDecision = this.assertSnapshot(execution);
+    const savedDecision = assertSnapshot(execution);
     // Current rules may restrict an old allowance, but cannot upgrade a saved denial.
     const current = execution.policyDecision === "ALLOW" ? evaluate() : null;
     if (current && current.policyDecision !== "ALLOW") {
@@ -125,7 +136,7 @@ export class ActionsService {
 
   async reconcile(identity: ExecutionReader, id: string, input: unknown) {
     this.assertExecutionEnabled();
-    this.assertRecoveryInput(id, input);
+    assertRecoveryInput(id, input);
     const execution = await this.executions.getStored(identity, id);
     if (!["EXECUTING", "OUTCOME_UNKNOWN"].includes(execution.status))
       return this.executions.get(identity, id);
@@ -149,17 +160,6 @@ export class ActionsService {
       ...(await this.executions.expireLease(identity, id)),
       reconciliation: { status: "NOT_FOUND", retrySafeFromAbsence: false },
     };
-  }
-
-  private assertRecoveryInput(id: string, input: unknown) {
-    if (
-      !z.uuid().safeParse(id).success ||
-      !z.strictObject({}).safeParse(input === undefined ? {} : input).success
-    ) {
-      throw new BadRequestException(
-        "Recovery accepts an execution id and no action payload",
-      );
-    }
   }
 
   private assertRecoveryContract(
@@ -195,7 +195,8 @@ export class ActionsService {
       );
     }
     const execution = await this.executions.getStored(identity, id);
-    this.assertNotDenied(execution);
+    assertNotDenied(execution);
+    assertUnexpired(execution);
     if (!retry && execution.status !== "RECEIVED")
       return this.readExecution(identity, id);
     if (retry) {
@@ -225,41 +226,13 @@ export class ActionsService {
           message: "Execution cannot be retried now",
         });
     }
-    this.assertSnapshot(execution);
+    assertSnapshot(execution);
     if (execution.policyDecision === "DENY") {
       throw blocked(BLOCK_CODE.POLICY_DENIED, "Action denied by policy", {
         executionId: id,
       });
     }
-    let binding: { id: string; requestHash: string } | undefined;
-    if (execution.policyDecision === "REQUIRE_APPROVAL") {
-      const approval = execution.approval;
-      if (
-        !approval ||
-        approval.organizationId !== execution.organizationId ||
-        approval.executionId !== id
-      ) {
-        throw new ConflictException("Approval binding is missing or invalid");
-      }
-      if (approval.status !== "APPROVED") {
-        throw blocked(
-          approval.status === "REJECTED"
-            ? BLOCK_CODE.APPROVAL_REJECTED
-            : BLOCK_CODE.POLICY_APPROVAL_REQUIRED,
-          approval.status === "REJECTED"
-            ? "Approval was rejected"
-            : "Action requires approval",
-          {
-            executionId: id,
-            approvalId: approval.id,
-            approvalStatus: approval.status,
-          },
-        );
-      }
-      if (!approval.decidedAt || !approval.decidedByUserId)
-        throw new ConflictException("Approval decision evidence is incomplete");
-      binding = { id: approval.id, requestHash: approval.requestHash };
-    }
+    const binding = requireApprovalBinding(execution);
     const request = verifiedActionRequest(
       execution,
       binding?.requestHash ?? execution.requestHash ?? "",
@@ -274,7 +247,7 @@ export class ActionsService {
     }
     // A valid historical hash must also describe an action supported by today's registry.
     try {
-      const parsed = new ActionRegistry().parse(
+      const parsed = this.registry.parse(
         request.action.name,
         request.arguments,
       );
@@ -285,7 +258,7 @@ export class ActionsService {
         throw new ConflictException("Stored action is no longer supported");
       throw error;
     }
-    const current = this.evaluatePolicy(request);
+    const current = evaluatePolicy(request, this.policies, this.policyEngine);
     const decision = current.policyDecision;
     if (
       !retry &&
@@ -322,47 +295,10 @@ export class ActionsService {
     return this.dispatch(identity, id, request, attemptId);
   }
 
-  private assertSnapshot(
-    execution: Pick<
-      Execution,
-      | "id"
-      | "policyDecision"
-      | "policyReason"
-      | "policyHash"
-      | "policyEvaluatedAt"
-    >,
-  ) {
-    if (
-      !execution.policyDecision ||
-      !execution.policyReason ||
-      !execution.policyHash ||
-      !execution.policyEvaluatedAt
-    ) {
-      throw new ConflictException({
-        statusCode: 409,
-        error: "Conflict",
-        code: "LEGACY_EXECUTION_REQUIRES_REVIEW",
-        message:
-          "Original policy decision is unavailable; execution requires review",
-        executionId: execution.id,
-      });
-    }
-    return execution.policyDecision;
-  }
-
-  private assertNotDenied(execution: Pick<Execution, "id" | "status">) {
-    if (execution.status === "DENIED") {
-      throw blocked(
-        BLOCK_CODE.POLICY_TIGHTENED,
-        "Execution permanently blocked after policy tightening",
-        { executionId: execution.id },
-      );
-    }
-  }
-
   private async readExecution(identity: AuthenticatedAgent, id: string) {
     const execution = await this.executions.get(identity, id);
-    this.assertNotDenied(execution);
+    assertNotDenied(execution);
+    assertUnexpired(execution);
     return execution;
   }
 
@@ -376,26 +312,10 @@ export class ActionsService {
       id,
       evidence,
     );
-    this.assertNotDenied(execution);
+    assertNotDenied(execution);
+    assertUnexpired(execution);
     // Claim may have won before the denial write: return its actual state.
     return execution;
-  }
-
-  private evaluatePolicy(request: ActionRequest) {
-    try {
-      const rules = this.policies.forOrganization(request.organizationId);
-      const result = this.policyEngine.evaluateDetailed(request, rules);
-      return {
-        policyDecision: result.decision,
-        policyReason: result.reason,
-        policyHash: createHash("sha256")
-          .update(JSON.stringify({ version: 1, rules }))
-          .digest("hex"),
-        policyEvaluatedAt: new Date(),
-      };
-    } catch {
-      throw new ServiceUnavailableException("Policy evaluation unavailable");
-    }
   }
 
   private assertExecutionEnabled() {

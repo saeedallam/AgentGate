@@ -5,14 +5,18 @@ export default function create(context) {
     const state = context.getState();
     const x = await api(url("executions/" + encodeURIComponent(id)));
     const bound = state.agent?.agentId === x.agentId;
+    const expired =
+      x.status === "RECEIVED" &&
+      x.expiresAt &&
+      new Date(x.expiresAt).getTime() <= Date.now();
     const canResume =
-      x.status === "RECEIVED" && x.approval?.status === "APPROVED";
+      !expired && x.status === "RECEIVED" && x.approval?.status === "APPROVED";
     const uncertain = ["EXECUTING", "OUTCOME_UNKNOWN"].includes(x.status);
     modal(
       "Execution details",
       `<div class="row between">
 <code>${e(x.actionName)}</code>${badge(x.status)}</div>
-<div class="code-row">
+${expired ? '<div class="notice">First-dispatch authorization has expired. This request cannot start.</div>' : ""}<div class="code-row">
 <code>${e(x.id)}</code>${btn(icon("copy"), "copy-text", "ghost compact", `data-text="${e(x.id)}" aria-label="Copy execution ID"`)}</div>
 <div class="detail-grid">
 <div>
