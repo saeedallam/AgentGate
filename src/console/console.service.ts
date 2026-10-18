@@ -73,10 +73,17 @@ export class ConsoleService {
   private scope(
     userId: string,
     organizationId: string,
+    requiredRole?: "OWNER",
   ): Prisma.ExecutionWhereInput {
     return {
       organizationId,
-      agent: { organization: { members: { some: { userId } } } },
+      agent: {
+        organization: {
+          members: {
+            some: { userId, ...(requiredRole ? { role: requiredRole } : {}) },
+          },
+        },
+      },
     };
   }
 
@@ -166,8 +173,8 @@ export class ConsoleService {
     const owner = member.role === "OWNER";
     const row = await this.prisma.execution.findFirst({
       where: {
-        ...this.scope(userId, organizationId), id,
-        ...(owner ? { agent: { organization: { members: { some: { userId, role: 'OWNER' as const } } } } } : {}),
+        ...this.scope(userId, organizationId, owner ? "OWNER" : undefined),
+        id,
       },
       select: {
         ...executionSummary,

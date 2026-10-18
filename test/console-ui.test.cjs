@@ -36,6 +36,9 @@ async function setup(custom = () => undefined) {
     lockIntent: model.lockIntent,
     shortId: model.shortId,
   });
+  w.createViews = (
+    await import("../public/console/pages/index.mjs")
+  ).createViews;
   w.crypto.randomUUID = randomUUID;
   w.confirm = () => true;
   w.HTMLDialogElement.prototype.showModal = function () {
@@ -128,7 +131,7 @@ async function setup(custom = () => undefined) {
   };
   w.eval(
     readFileSync("public/console/app.mjs", "utf8").replace(
-      /^import[\s\S]*?;\s*/,
+      /^(?:import[\s\S]*?;\s*)+/,
       "",
     ),
   );

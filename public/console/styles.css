@@ -1398,3 +1398,15 @@ h2 {
     height: 62px;
   }
 }
+
+/* Keep the history filter from squeezing its heading. */
+.panel-title > #execution-filter {
+  width: auto;
+  flex: 0 1 240px;
+  max-width: 100%;
+}
+@media (max-width: 600px) {
+  .panel-title:has(#execution-filter) {
+    flex-wrap: wrap;
+  }
+}

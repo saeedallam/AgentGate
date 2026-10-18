@@ -182,6 +182,58 @@ test("console monitoring scopes workspaces, counts, cursors and owner detail wit
       organizationId: orgs[0],
       agentId: agents[0],
     });
+    // Force a role change after the preliminary check, before the sensitive query.
+    const { ConsoleService } = require("../dist/console/console.service.js");
+    const { ConfigService } = require("@nestjs/config");
+    const memberKey = {
+      organizationId_userId: { organizationId: orgs[0], userId: users[0] },
+    };
+    const racedDb = {
+      execution: db.execution,
+      organizationMember: {
+        findUnique: async (input) => {
+          const snapshot = await db.organizationMember.findUnique(input);
+          await db.organizationMember.update({
+            where: memberKey,
+            data: { role: "MEMBER" },
+          });
+          return snapshot;
+        },
+      },
+    };
+    const consoleReader = new ConsoleService(racedDb, new ConfigService());
+    await assert.rejects(
+      consoleReader.execution(users[0], orgs[0], executionIds[0]),
+      (e) => e.getStatus() === 404,
+    );
+    // Human reconciliation scope must also reject a former owner, not fabricate a credential.
+    await assert.rejects(
+      app
+        .get(ExecutionsService)
+        .getStored(
+          {
+            kind: "owner",
+            userId: users[0],
+            organizationId: orgs[0],
+            agentId: agents[0],
+          },
+          executionIds[0],
+        ),
+      (e) => e.getStatus() === 404,
+    );
+    await db.organizationMember.update({
+      where: memberKey,
+      data: { role: "OWNER" },
+    });
+    racedDb.organizationMember.findUnique = async (input) => {
+      const snapshot = await db.organizationMember.findUnique(input);
+      await db.organizationMember.delete({ where: memberKey });
+      return snapshot;
+    };
+    assert.deepEqual(
+      (await consoleReader.executions(users[0], orgs[0], {})).items,
+      [],
+    );
     assert.equal(await db.executionAttempt.count({ where }), 0);
     assert.equal(await db.fakeProviderReceipt.count({ where }), 0);
     assert.equal(await db.refundBudgetReservation.count({ where }), 0);

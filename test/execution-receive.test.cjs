@@ -14,14 +14,14 @@ test('receipt race returns the winner decision and never overwrites it with the 
     $transaction: async callback => callback({ execution: { createMany: async input => {
       assert.equal(input.skipDuplicates, true); return { count: 0 };
     }, findFirstOrThrow: async () => { lookups++; return winner; } } }),
-  });
+  }, new (require('@nestjs/config').ConfigService)({ REFUND_BUDGETS_JSON: '[]' }));
   assert.equal(await service.receive(request, 'key', () => snapshot), winner);
   assert.equal(lookups, 2);
 });
 
 test('existing receipts bypass evaluation and reject changed payload before permission checks', async () => {
   const winner = { requestHash: actionJson(request).hash, policyDecision: 'DENY' };
-  const service = new ExecutionsService({ execution: { findFirst: async () => winner } });
+  const service = new ExecutionsService({ execution: { findFirst: async () => winner } }, new (require('@nestjs/config').ConfigService)({ REFUND_BUDGETS_JSON: '[]' }));
   const forbidden = () => { assert.fail('replay must not evaluate a new initial decision'); };
   assert.equal(await service.receive(request, 'key', forbidden), winner);
   await assert.rejects(service.receive({ ...request, arguments: { ...request.arguments, amountMinor: 200 } }, 'key', forbidden), e => e.getStatus() === 409);

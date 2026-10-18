@@ -19,7 +19,7 @@ test('policy tightening permanently denies saved allowances without rewriting in
   const identity = { organizationId, agentId: randomUUID(), credentialId: randomUUID() };
   const where = { organizationId };
   const config = new ConfigService({ FAKE_EXECUTION_ENABLED: true, NODE_ENV: 'test', ACTION_ENVIRONMENT: 'development' });
-  const executions = new ExecutionsService(db);
+  const executions = new ExecutionsService(db, new (require('@nestjs/config').ConfigService)({ REFUND_BUDGETS_JSON: '[]' }));
   let effects = 0;
   const provider = { execute: async () => { effects++; throw new Error('must not dispatch'); } };
   const service = effect => new ActionsService(executions, provider, config,

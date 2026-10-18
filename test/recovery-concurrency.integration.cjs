@@ -41,7 +41,7 @@ test('native independent retries fence old completions and provider races commit
       arguments: { paymentId: 'race', amountMinor: 1000, currency: 'USD' }, resource: { type: 'payment', id: 'race' },
       context: { environment: 'development', requestedAt: new Date() } };
     await db.fakePayment.create({ data: { organizationId, id: 'race', amountMinor: 100000 } });
-    const service = new ExecutionsService(db);
+    const service = new ExecutionsService(db, new (require('@nestjs/config').ConfigService)({ REFUND_BUDGETS_JSON: '[]' }));
     const execution = await service.receive(request, 'race', () => ({ policyDecision: 'ALLOW', policyReason: 'MATCHED_ALLOW', policyHash: 'a'.repeat(64), policyEvaluatedAt: new Date() }));
     const firstAttempt = randomUUID();
     await service.claim(identity, execution.id, undefined, firstAttempt);
@@ -49,7 +49,7 @@ test('native independent retries fence old completions and provider races commit
     let wait = gate(), pids = new Set();
     const attempts = [randomUUID(), randomUUID()];
     const claims = await Promise.all(clients.map((client, i) =>
-      new ExecutionsService(synchronized(client, wait, pids)).claimRetry(identity, execution.id, 1, attempts[i])));
+      new ExecutionsService(synchronized(client, wait, pids), new (require('@nestjs/config').ConfigService)({ REFUND_BUDGETS_JSON: '[]' })).claimRetry(identity, execution.id, 1, attempts[i])));
     assert.equal(pids.size, 2);
     assert.deepEqual(claims.slice().sort(), [false, true]);
     const winnerId = attempts[claims.findIndex(Boolean)];
@@ -71,8 +71,8 @@ test('native independent retries fence old completions and provider races commit
     // Reconciliation and a worker finishing contend on the same execution row.
     wait = gate(); pids = new Set();
     const finishes = await Promise.allSettled([
-      new ExecutionsService(synchronized(clients[0], wait, pids)).finish(identity, execution.id, outcomes[0], winnerId),
-      new ExecutionsService(synchronized(clients[1], wait, pids)).reconcile(identity, execution.id, outcomes[1]),
+      new ExecutionsService(synchronized(clients[0], wait, pids), new (require('@nestjs/config').ConfigService)({ REFUND_BUDGETS_JSON: '[]' })).finish(identity, execution.id, outcomes[0], winnerId),
+      new ExecutionsService(synchronized(clients[1], wait, pids), new (require('@nestjs/config').ConfigService)({ REFUND_BUDGETS_JSON: '[]' })).reconcile(identity, execution.id, outcomes[1]),
     ]);
     assert.equal(pids.size, 2);
     for (const row of finishes) if (row.status === 'rejected') assert.equal(row.reason.getStatus(), 409);

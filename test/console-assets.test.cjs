@@ -21,6 +21,9 @@ test("console serves only allowlisted public assets with a strict CSP and leaves
       "/console",
       "/console/app.mjs",
       "/console/model.mjs",
+      ...require("node:fs")
+        .readdirSync("public/console/pages")
+        .map((name) => "/console/pages/" + name),
       "/console/styles.css",
       "/console/logo.svg",
       "/console/fonts/dmsans.ttf",
@@ -38,6 +41,17 @@ test("console serves only allowlisted public assets with a strict CSP and leaves
         !result.headers["content-security-policy"].includes("unsafe-inline"),
       );
       assert.equal(result.headers["x-content-type-options"], "nosniff");
+    }
+    for (const path of [
+      "/console/pages/missing.mjs",
+      "/console/fonts/missing.ttf",
+      "/console/%2e%2e/.env",
+      "/console/pages/%2e%2e/%2e%2e/.env",
+    ]) {
+      assert.equal(
+        (await app.inject({ method: "GET", url: path })).statusCode,
+        404,
+      );
     }
     const html = (await app.inject({ method: "GET", url: "/console" })).body;
     assert.match(html, /lang="en" dir="ltr"/);

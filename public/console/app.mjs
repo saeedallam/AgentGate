@@ -1,3 +1,4 @@
+import { createViews } from "./pages/index.mjs";
 import {
   escapeHtml as e,
   labels,
@@ -89,6 +90,37 @@ const json = (data) =>
   `<pre tabindex="0">${e(JSON.stringify(data, null, 2))}</pre>`;
 const field = (label, name, attrs = "", hint = "") =>
   `<label class="field">${label}<input name="${name}" ${attrs}>${hint ? `<small>${hint}</small>` : ""}</label>`;
+const {
+  overviewView,
+  executionsView,
+  agentsView,
+  approvalsView,
+  budgetView,
+  studiesView,
+  playgroundView,
+  helpView,
+  openExecution,
+  openApproval,
+} = createViews({
+  getState: () => state,
+  modal,
+  e,
+  labels,
+  money,
+  shortId,
+  api,
+  url,
+  owner,
+  btn,
+  badge,
+  empty,
+  pageHead,
+  json,
+  field,
+  date,
+  icon,
+});
+
 function notify(message) {
   clearTimeout(toastTimer);
   toast.textContent = message;
@@ -296,100 +328,7 @@ async function navigate(page = state.page) {
     );
   }
 }
-function executionTable(items) {
-  return items.length
-    ? `<div class="table-wrap"><table class="table"><thead><tr><th>Action / execution</th><th>Agent</th><th>Status</th><th>Policy</th><th>Time</th></tr></thead><tbody>${items.map((x) => `<tr><td><button class="link mono" type="button" data-act="execution" data-id="${e(x.id)}">${e(x.actionName)}</button><small class="mono">${e(shortId(x.id))}</small></td><td><code>${e(x.agent?.name || shortId(x.agentId))}</code></td><td>${badge(x.status)}</td><td>${x.policyDecision ? badge(x.policyDecision) : '<span class="muted">No policy snapshot</span>'}</td><td>${e(date(x.createdAt))}</td></tr>`).join("")}</tbody></table></div>`
-    : empty(
-        "No executions yet",
-        "Your first AgentGate request will appear here with its actual outcome.",
-        btn("Action playground", "nav", "primary", 'data-page="playground"'),
-      );
-}
-function hiveArt() {
-  return `<svg class="hive-art" viewBox="0 0 400 240" fill="none" aria-hidden="true"><defs><pattern id="hex" width="76" height="88" patternUnits="userSpaceOnUse"><path d="M38 1 75 22v44L38 87 1 66V22Z" stroke="#b8c8ab" stroke-opacity=".12"/></pattern><radialGradient id="glow"><stop stop-color="#b0b979" stop-opacity=".17"/><stop offset="1" stop-color="#b0b979" stop-opacity="0"/></radialGradient></defs><rect width="400" height="240" fill="url(#hex)"/><circle cx="220" cy="125" r="125" fill="url(#glow)"/><path d="M205 40 269 77v74l-64 37-64-37V77Z" stroke="#e5c86d" stroke-opacity=".25"/><path d="m205 57 49 28v58l-49 28-49-28V85Z" fill="#2c4735" stroke="#d8bf68"/><path d="m205 79 30 17v13h-14v-6l-16-9-16 9v24l16 9 16-9v-3h-17v-13h31v24l-30 18-30-18V96Z" fill="#e9cd76"/><path d="M20 115h75l27-15h34M255 115h40l23 14h65" stroke="#cab469" stroke-dasharray="4 5"/><circle cx="95" cy="115" r="4" fill="#d6bd65"/><circle cx="320" cy="129" r="4" fill="#d6bd65"/><rect x="265" y="174" width="94" height="25" rx="12" fill="#3c5140" stroke="#637255"/><circle cx="279" cy="187" r="3" fill="#bdd694"/><text x="289" y="190" fill="#d1dec4" font-size="8" font-family="sans-serif">Policy gate</text><path d="m99 36 7 4v8l-7 4-7-4v-8Z" fill="#c9ac53" fill-opacity=".5"/></svg>`;
-}
-async function overviewView() {
-  const data = await api(url("overview"));
-  state.overview = data;
-  const stat = (title, value, sub, ic) =>
-    `<article class="stat"><div class="stat-top">${title}<span class="stat-icon">${icon(ic)}</span></div><div class="number">${e(String(value).padStart(2, "0"))}</div><span class="small muted">${sub}</span></article>`;
-  return `${pageHead("Your hive, under control.", "A clear view of what your agents are doing — and what they are allowed to do.", btn("+ Try an action", "nav", "primary", 'data-page="playground"'))}
-    <section class="hero"><div class="hero-copy"><div class="eyebrow">The control layer for your agents</div><h2>Let agents do the work.<br><em>You set the boundaries.</em></h2><p>Every action meets your policies before it reaches execution.<br>Explore the gate. See every decision.</p>${btn("Open the playground ↗", "nav", "hero-button", 'data-page="playground"')}</div>${hiveArt()}</section>
-    <section class="stats">${stat("Total requests", data.totalExecutions, "Across your workspace · all time", "bolt")}${stat("Awaiting approval", data.pendingApprovals, "Waiting for a human decision", "shield")}${stat("Active agents", data.activeAgents, "Out of " + data.agents + " agents", "agents")}${stat("Uncertain outcomes", data.counts.OUTCOME_UNKNOWN || 0, "Check before attempting again", "clock")}</section>
-    <div class="overview-columns"><section class="panel"><div class="panel-title"><div><h2>Recent executions</h2><p class="small muted">The latest activity across your hive</p></div>${btn("View all ↗", "nav", "ghost compact", 'data-page="executions"')}</div>${executionTable(data.recent)}</section>
-    <section class="panel"><div class="panel-title"><h2>Execution breakdown</h2><span class="small muted">ALL TIME</span></div><p class="small muted">Recorded execution outcomes</p>${["SUCCEEDED", "RECEIVED", "EXECUTING", "DENIED", "FAILED", "OUTCOME_UNKNOWN"].map((status) => `<div class="bar-row"><span>${e(labels[status])}</span><progress max="${Math.max(data.totalExecutions, 1)}" value="${data.counts[status] || 0}" aria-label="${e(labels[status])}"></progress><b>${data.counts[status] || 0}</b></div>`).join("")}</section></div>
-    <div class="guide-card"><div class="row"><img src="/console/logo.svg" alt=""><div><h3>From your first agent to your first action.</h3><p>A short guide to a complete workflow without Postman.</p></div></div>${btn("Getting started ↗", "nav", "", 'data-page="help"')}</div>
-    <div class="console-footer"><span>${e(state.org.name)} · ${e(data.environment)}</span><span>${data.fakeExecutionEnabled ? "Fake Commerce enabled · effects are simulated" : "Fake execution disabled"} · Connected backend</span></div>`;
-}
-async function executionsView() {
-  const q = new URLSearchParams();
-  if (state.filter) q.set("status", state.filter);
-  if (state.cursor) q.set("cursor", state.cursor);
-  const data = await api(url("executions") + "?" + q);
-  return `${pageHead("Executions", "Follow the decision, attempts and outcome in one record.")}<section class="panel"><div class="panel-title"><h2>Action history</h2><select id="execution-filter" class="control" aria-label="Filter by status"><option value="">All statuses</option>${["RECEIVED", "EXECUTING", "SUCCEEDED", "FAILED", "DENIED", "OUTCOME_UNKNOWN"].map((s) => `<option value="${s}" ${state.filter === s ? "selected" : ""}>${labels[s]}</option>`).join("")}</select></div>${executionTable(data.items)}<div class="pager"><span>Up to 25 requests per page</span><div class="row">${state.cursor ? btn("Newest", "exec-first", "compact") : ""}${data.nextCursor ? btn("Older", "exec-next", "compact", `data-id="${e(data.nextCursor)}"`) : ""}</div></div></section>`;
-}
-async function agentsView() {
-  const data = await api(
-    "/agents?" +
-      new URLSearchParams({
-        organizationId: state.org.id,
-        limit: "20",
-        offset: String(state.agentOffset),
-      }),
-  );
-  return `${pageHead("Agents & keys", "Distinct agent identities. New keys are shown only once.", owner() ? btn(icon("plus") + " Add agent", "new-agent", "primary") : "")}<section class="panel">${data.items.length ? `<div class="table-wrap"><table class="table"><thead><tr><th>Agent</th><th>Status</th><th>Created</th><th>Key management</th></tr></thead><tbody>${data.items.map((a) => `<tr><td><strong class="mono">${e(a.name)}</strong><small class="mono">${e(a.id)}</small></td><td>${badge(a.status)}</td><td>${e(date(a.createdAt))}</td><td>${owner() ? btn(icon("key") + " Issue key", "issue-key", "compact", `data-id="${e(a.id)}" data-name="${e(a.name)}"`) : '<span class="muted">Owner access only</span>'}</td></tr>`).join("")}</tbody></table></div>` : empty("Add your first agent", "Use a clear name such as refund-agent to identify its requests.", owner() ? btn("Add agent", "new-agent", "primary") : "")}<div class="pager"><span>20 agents per page</span><div class="row">${state.agentOffset ? btn("Previous", "agent-prev", "compact") : ""}${data.hasMore ? btn("Next", "agent-next", "compact") : ""}</div></div></section><p class="footer-note">Agent suspension and key revocation are not available in this console release.</p>`;
-}
-async function approvalsView() {
-  const data = await api(
-    "/v1/approvals?" +
-      new URLSearchParams({
-        organizationId: state.org.id,
-        limit: "20",
-        offset: String(state.approvalOffset),
-      }),
-  );
-  return `${pageHead("Approvals", "Review the stored action before deciding. Approval alone does not execute it.")}<div class="notice">${owner() ? "Approval and rejection decisions are final. Open the request and review its values before deciding." : "MEMBER access includes summaries only. Request details and decisions are restricted to the owner."}</div><section class="panel">${data.items.length ? `<div class="table-wrap"><table class="table"><thead><tr><th>Action</th><th>Approval status</th><th>Execution status</th><th>Requested</th><th></th></tr></thead><tbody>${data.items.map((a) => `<tr><td><code>${e(a.actionName)}</code><small class="mono">${e(shortId(a.id))}</small></td><td>${badge(a.status)}</td><td>${badge(a.executionStatus)}</td><td>${e(date(a.createdAt))}</td><td>${btn(owner() ? "Review request" : "View summary", "approval", "compact", `data-id="${e(a.id)}"`)}</td></tr>`).join("")}</tbody></table></div>` : empty("No approvals yet", "Requests that need a human decision will appear here.")}<div class="pager"><span>Newest first</span><div class="row">${state.approvalOffset ? btn("Previous", "approval-prev", "compact") : ""}${data.items.length === 20 && state.approvalOffset < 10000 ? btn("Next", "approval-next", "compact") : ""}</div></div></section>`;
-}
-function budgetView() {
-  return `${pageHead("Refund budget", "Daily workspace capacity, scoped to the UTC day execution first starts.")}<section class="panel"><form data-form="budget" class="row">${field("Day — UTC", "day", `type="date" value="${new Date().toISOString().slice(0, 10)}" required`)}<label class="field">Environment<select name="environment">${["development", "staging", "production"].map((x) => `<option ${state.overview?.environment === x ? "selected" : ""}>${x}</option>`).join("")}</select></label><button class="btn primary" type="submit">View budget</button><div class="form-error" role="alert"></div></form></section><div id="budget-result">${empty("Choose a day and environment", "A budget record appears after the first reservation in an enabled scope. No record does not mean zero capacity.")}</div><div class="notice">Uncertain outcomes retain their reservation. Retries reuse it, even after a new day begins.</div>`;
-}
-async function studiesView() {
-  const q = state.studyCursor
-    ? "?cursor=" + encodeURIComponent(state.studyCursor)
-    : "";
-  const data = await api(
-    `/v1/organizations/${state.org.id}/policy-observations${q}`,
-  );
-  return `${pageHead("Observe before you execute", "Hypothetical decisions and historical simulations do not authorize execution.", owner() ? btn(icon("flask") + " Simulate policy", "simulate", "primary") : "")}<div class="notice">ALLOW here is not execution approval. Simulation does not check budget or provider state and does not change the active policy.</div><section class="panel">${data.items.length ? `<div class="table-wrap"><table class="table"><thead><tr><th>Study</th><th>Type</th><th>Allow / deny / approval</th><th>Date</th><th></th></tr></thead><tbody>${data.items.map((s) => `<tr><td><code>${e(shortId(s.id))}</code></td><td>${s.mode === "SIMULATE" ? "Historical simulation" : "Action observation"}</td><td><code>${e(s.summary?.allow ?? 0)} / ${e(s.summary?.deny ?? 0)} / ${e(s.summary?.requireApproval ?? 0)}</code></td><td>${e(date(s.createdAt))}</td><td>${btn("Details", "study", "compact", `data-id="${e(s.id)}"`)}</td></tr>`).join("")}</tbody></table></div>` : empty("No studies yet", "Use Observe only in the playground, or simulate a policy against stored executions.")}<div class="pager"><span>Unexpired records only · 30-day retention</span><div class="row">${state.studyCursor ? btn("Newest", "study-first", "compact") : ""}${data.nextCursor ? btn("Older", "study-next", "compact", `data-id="${e(data.nextCursor)}"`) : ""}</div></div></section>`;
-}
-function playgroundView() {
-  const d = state.draft;
-  return `${pageHead("Action playground", "Real API requests. Simulated effects inside Fake Commerce.")}<div class="two"><section class="panel stack"><div class="panel-title"><h2>Propose an action</h2><code>refund.create</code></div><div class="key-state">${icon("key")}<span>${state.agent ? "Agent connected · " + e(shortId(state.agent.agentId)) : "No agent key connected"}</span>${btn(state.agent ? "Change" : "Connect key", "bind-key", "ghost compact")}</div><form class="form" data-form="action">${field("Payment ID", "paymentId", `value="${e(d.paymentId)}" placeholder="payment_demo" dir="ltr" required maxlength="128" ${state.intent ? "disabled" : ""}`, "Prepare this payment in the lab for the same organization first.")}${field("Amount (USD)", "amount", `value="${e(d.amount)}" inputmode="decimal" dir="ltr" required ${state.intent ? "disabled" : ""}`, "Example: $100.00 = 10000 cents. Conversion is automatic.")}${field("Idempotency key", "idempotencyKey", `value="${e(d.key)}" dir="ltr" required maxlength="128" ${state.intent ? "disabled" : ""}`, "The same key and payload return the same execution record.")}<div class="form-error" role="alert"></div><div class="row"><button type="submit" class="btn primary" name="mode" value="submit" ${!state.agent ? "disabled" : ""}>${icon("bolt")}${state.intent ? "Resend the same request" : "Submit action"}</button><button type="submit" class="btn" name="mode" value="observe" ${!state.agent ? "disabled" : ""}>${icon("flask")}Observe only</button></div></form>${state.intent ? `<div class="notice">This page keeps the request and its key in memory. Save its ID before closing. Do not start a new request if the outcome is uncertain.</div>${btn("Copy key", "copy-intent", "compact")}${btn("Start a new request", "new-intent", "ghost compact")}` : ""}</section><section class="panel stack"><div><h2>Gate response</h2><p class="small muted">The server response, without changing execution state in the browser.</p></div>${state.lastResult ? resultView(state.lastResult) : empty("Ready when you are.", "Start with observation to understand the policy decision before submitting an action.")}${state.lastObserved ? `<div class="result"><h3>Latest observation — no action executed</h3>${json(state.lastObserved)}</div>` : ""}</section></div>`;
-}
-function resultView(data) {
-  return `<div class="result">${data.status ? badge(data.status) : data.decision ? badge(data.decision) : '<span class="pill warn">Response needs review</span>'}${data.message ? `<p>${e(data.message)}</p>` : ""}${json(data)}<div class="row">${(data.id && !data.mode) || data.executionId ? btn("View execution", "execution", "compact", `data-id="${e(data.executionId || data.id)}"`) : ""}${data.approvalId ? btn("Review approval", "approval", "compact", `data-id="${e(data.approvalId)}"`) : ""}</div></div>`;
-}
-function helpView() {
-  return `${pageHead("Your hive, step by step.", "Start with a small, understandable experiment using your actual server data.")}<div class="two"><section class="panel"><div class="help-list"><div class="help-item"><div><h3>A workspace and an agent</h3><p>Create a workspace, then add an agent such as refund-agent. Select Issue key and keep the secret outside your repository.</p>${btn("Agents & keys", "nav", "ghost compact", 'data-page="agents"')}</div></div><div class="help-item"><div><h3>Prepare the server policy</h3><p>The active policy is configured in POLICY_RULES_JSON. The default is deny. Run this script to generate sample rules, put the output in .env, then restart the server.</p><pre>node scripts/print-demo-policy.mjs ${e(state.org.id)}</pre></div></div><div class="help-item"><div><h3>Prepare a fake payment</h3><p>Run this script in a development terminal connected to the correct database with Fake Commerce enabled. The value 100000 means $1000.</p><pre>node scripts/seed-fake-payment.mjs ${e(state.org.id)} payment_console 100000</pre></div></div><div class="help-item"><div><h3>Observe, approve, then execute</h3><p>Connect an agent key in the playground. If approval is required, review it as owner, then resume from execution details. The decision alone does not call the provider.</p>${btn("Try an action", "nav", "primary compact", 'data-page="playground"')}</div></div></div></section><section class="panel stack"><h2>Clear boundaries. A clearer experience.</h2><div class="notice">Fake execution is prohibited when NODE_ENV=production. The console does not change server settings.</div><p>The session and agent key stay in page memory only, never in localStorage or browser files. Reloading or signing out clears them.</p><p>Owners review request details and make decisions. Members see safe summaries without arguments or results.</p><p>Every execution remains subject to backend policy, approvals, claims and budget checks. Hiding a button does not grant or enforce authority.</p><div class="separator"></div><h3>Workspace reference</h3><div class="code-row"><code>${e(state.org.id)}</code>${btn(icon("copy"), "copy-org", "ghost compact", 'aria-label="Copy workspace ID"')}</div><p class="small muted">This console does not edit policies or budgets, or add a real payment provider.</p></section></div>`;
-}
-async function openExecution(id) {
-  const x = await api(url("executions/" + encodeURIComponent(id)));
-  const bound = state.agent?.agentId === x.agentId;
-  const canResume =
-    x.status === "RECEIVED" && x.approval?.status === "APPROVED";
-  const uncertain = ["EXECUTING", "OUTCOME_UNKNOWN"].includes(x.status);
-  modal(
-    "Execution details",
-    `<div class="row between"><code>${e(x.actionName)}</code>${badge(x.status)}</div><div class="code-row"><code>${e(x.id)}</code>${btn(icon("copy"), "copy-text", "ghost compact", `data-text="${e(x.id)}" aria-label="Copy execution ID"`)}</div><div class="detail-grid"><div><span>Agent</span><strong class="mono">${e(x.agent.name)}</strong></div><div><span>Environment</span><strong>${e(x.environment)}</strong></div><div><span>Original policy decision</span>${x.policyDecision ? badge(x.policyDecision) : "Not recorded"}</div><div><span>Decision reason</span><code>${e(x.policyReason || "—")}</code></div><div><span>Received</span><strong>${e(date(x.requestedAt))}</strong></div><div><span>Last updated</span><strong>${e(date(x.updatedAt))}</strong></div></div>${x.errorCode ? `<div class="notice error"><code>${e(x.errorCode)}</code></div>` : ""}${x.blockedPolicyDecision ? `<div class="notice">Policy tightened later: ${badge(x.blockedPolicyDecision)} · ${e(date(x.blockedAt))}</div>` : ""}${x.approval ? `<div class="row between"><span>Approval ${badge(x.approval.status)}</span>${btn("View approval", "approval", "compact", `data-id="${e(x.approval.id)}"`)}</div>` : ""}${owner() ? `<div><h3>Stored data</h3>${json({ arguments: x.arguments, result: x.result, resourceType: x.resourceType, resourceId: x.resourceId })}</div>` : '<div class="notice">MEMBER view: a summary without sensitive request or result data.</div>'}<div><h3>Execution attempts</h3>${x.attempts.length ? `<div class="timeline">${x.attempts.map((a) => `<div><div class="row"><b>Attempt ${a.attemptNumber}</b>${badge(a.status)}</div><small>${e(date(a.startedAt))}</small>${a.resolvedStatus ? `<p class="small">Outcome confirmed: ${badge(a.resolvedStatus)}</p>` : ""}${a.errorCode ? `<code>${e(a.errorCode)}</code>` : ""}</div>`).join("")}</div>` : '<p class="muted small">The provider has not been called.</p>'}</div>${uncertain ? '<div class="notice">A missing response does not prove non-execution. Start by checking the outcome. The server determines retry eligibility.</div>' : ""}<div class="row">${canResume && bound ? btn("Resume execution", "execution-op", "primary", `data-id="${e(x.id)}" data-op="resume"`) : ""}${uncertain && (owner() || bound) ? btn("Check outcome", "execution-op", "", `data-id="${e(x.id)}" data-op="reconcile"`) : ""}${x.status === "OUTCOME_UNKNOWN" && bound && x.attemptCount < 3 ? btn("Request a safe retry", "execution-op", "", `data-id="${e(x.id)}" data-op="retry"`) : ""}${btn("Refresh", "execution", "ghost", `data-id="${e(x.id)}"`)}</div>${(canResume || uncertain) && !bound ? '<p class="small muted">To resume or retry, connect a key for the same agent in the playground.</p>' : ""}`,
-  );
-}
-async function openApproval(id) {
-  const a = await api("/v1/approvals/" + encodeURIComponent(id));
-  modal(
-    "Review approval",
-    `<div class="row between"><code>${e(a.actionName)}</code>${badge(a.status)}</div><div class="detail-grid"><div><span>Approval ID</span><code>${e(a.id)}</code></div><div><span>Received at</span>${e(date(a.createdAt))}</div><div><span>Execution status</span>${badge(a.executionStatus)}</div><div><span>Decided at</span>${e(date(a.decidedAt))}</div></div>${a.request ? `<div class="notice">Review these values. Your decision binds to this stored action and cannot change once recorded.</div>${a.request.action.name === "refund.create" ? `<div class="row"><strong class="ltr">${money(a.request.arguments.amountMinor)}</strong><code>${e(a.request.arguments.paymentId)}</code></div>` : ""}${json(a.request)}` : '<div class="notice">Action details are available to the owner only.</div>'}${a.status === "PENDING" && owner() && a.request ? `<form data-form="decision" data-id="${e(a.id)}" class="form"><label class="checkline"><input type="checkbox" required>I reviewed the action, values and organization. I understand the decision is final and approval does not execute the action automatically.</label><div class="form-error" role="alert"></div><div class="row"><button class="btn primary" name="decision" value="APPROVED" type="submit">Approve action</button><button class="btn danger" name="decision" value="REJECTED" type="submit">Reject action</button></div></form>` : ""}${btn("View linked execution", "execution", "ghost", `data-id="${e(a.executionId)}"`)}`,
-  );
-}
+
 function bindModal() {
   modal(
     "Connect an agent key",

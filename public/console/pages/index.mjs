@@ -1,0 +1,30 @@
+import executionTableFactory from "./execution-table.mjs";
+import hiveArtFactory from "./hive-art.mjs";
+import resultViewFactory from "./result.mjs";
+import overviewViewFactory from "./overview.mjs";
+import executionsViewFactory from "./executions.mjs";
+import agentsViewFactory from "./agents.mjs";
+import approvalsViewFactory from "./approvals.mjs";
+import budgetViewFactory from "./budgets.mjs";
+import studiesViewFactory from "./studies.mjs";
+import playgroundViewFactory from "./playground.mjs";
+import helpViewFactory from "./help.mjs";
+import openExecutionFactory from "./execution-details.mjs";
+import openApprovalFactory from "./approval-details.mjs";
+export function createViews(context) {
+  const shared = { ...context };
+  shared.executionTable = executionTableFactory(shared);
+  shared.hiveArt = hiveArtFactory(shared);
+  shared.resultView = resultViewFactory(shared);
+  shared.overviewView = overviewViewFactory(shared);
+  shared.executionsView = executionsViewFactory(shared);
+  shared.agentsView = agentsViewFactory(shared);
+  shared.approvalsView = approvalsViewFactory(shared);
+  shared.budgetView = budgetViewFactory(shared);
+  shared.studiesView = studiesViewFactory(shared);
+  shared.playgroundView = playgroundViewFactory(shared);
+  shared.helpView = helpViewFactory(shared);
+  shared.openExecution = openExecutionFactory(shared);
+  shared.openApproval = openApprovalFactory(shared);
+  return shared;
+}

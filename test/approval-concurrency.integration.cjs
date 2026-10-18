@@ -71,7 +71,7 @@ test('native PostgreSQL resolves competing receipts, owner decisions and claims 
 
     // Competing snapshots must return the one committed receipt, never overwrite it.
     let gate = barrier(), pids = new Set();
-    let services = clients.map(client => new ExecutionsService(synchronized(client, 'execution', 'createMany', gate, pids)));
+    let services = clients.map(client => new ExecutionsService(synchronized(client, 'execution', 'createMany', gate, pids), new (require('@nestjs/config').ConfigService)({ REFUND_BUDGETS_JSON: '[]' })));
     const receipts = await Promise.all(services.map((service, i) => service.receive(request, 'decision-race', () => snapshot(i ? 'ALLOW' : 'DENY'))));
     assert.equal(pids.size, 2, 'requires native independent PostgreSQL backend sessions');
     assert.equal(receipts[0].id, receipts[1].id);
@@ -80,7 +80,7 @@ test('native PostgreSQL resolves competing receipts, owner decisions and claims 
 
     // Duplicate approval requests create one pending record atomically.
     gate = barrier(); pids = new Set();
-    services = clients.map(client => new ExecutionsService(synchronized(client, 'execution', 'createMany', gate, pids)));
+    services = clients.map(client => new ExecutionsService(synchronized(client, 'execution', 'createMany', gate, pids), new (require('@nestjs/config').ConfigService)({ REFUND_BUDGETS_JSON: '[]' })));
     const pending = await Promise.all(services.map(service => service.receive(request, 'approval-race', () => snapshot('REQUIRE_APPROVAL'))));
     assert.equal(pids.size, 2);
     assert.equal(pending[0].approval.id, pending[1].approval.id);
@@ -103,11 +103,11 @@ test('native PostgreSQL resolves competing receipts, owner decisions and claims 
     assert.equal(await db.executionAttempt.count({ where: scope }), 0);
 
     // Use a separately approved receipt so either owner can win the previous race.
-    const executions = new ExecutionsService(db);
+    const executions = new ExecutionsService(db, new (require('@nestjs/config').ConfigService)({ REFUND_BUDGETS_JSON: '[]' }));
     const approved = await executions.receive(request, 'claim-race', () => snapshot('REQUIRE_APPROVAL'));
     await new ApprovalsService(db).decide(owners[0], approved.approval.id, { decision: 'APPROVED' });
     gate = barrier(); pids = new Set();
-    services = clients.map(client => new ExecutionsService(synchronized(client, 'execution', 'updateMany', gate, pids)));
+    services = clients.map(client => new ExecutionsService(synchronized(client, 'execution', 'updateMany', gate, pids), new (require('@nestjs/config').ConfigService)({ REFUND_BUDGETS_JSON: '[]' })));
     const binding = { id: approved.approval.id, requestHash: approved.requestHash };
     const claims = await Promise.all(services.map(service => service.claim(identity, approved.id, binding)));
     assert.equal(pids.size, 2); assert.deepEqual(claims.slice().sort(), [false, true]);
@@ -118,7 +118,7 @@ test('native PostgreSQL resolves competing receipts, owner decisions and claims 
     for (let i = 0; i < 3; i++) {
       const receipt = await executions.receive(request, 'denial-claim-' + i, () => snapshot('ALLOW'));
       gate = barrier(); pids = new Set();
-      services = clients.map(client => new ExecutionsService(synchronized(client, 'execution', 'updateMany', gate, pids)));
+      services = clients.map(client => new ExecutionsService(synchronized(client, 'execution', 'updateMany', gate, pids), new (require('@nestjs/config').ConfigService)({ REFUND_BUDGETS_JSON: '[]' })));
       const evidence = snapshot('REQUIRE_APPROVAL');
       const [denial, claimed] = await Promise.all([
         services[0].denyForPolicyTightening(identity, receipt.id, evidence),

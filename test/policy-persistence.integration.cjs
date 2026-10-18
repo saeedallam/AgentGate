@@ -20,7 +20,7 @@ test('policy snapshots survive replay, approvals are atomic, and legacy requests
   const identity = { organizationId, agentId: randomUUID(), credentialId: randomUUID() };
   const where = { organizationId };
   const config = new ConfigService({ FAKE_EXECUTION_ENABLED: true, NODE_ENV: 'test', ACTION_ENVIRONMENT: 'development' });
-  const executions = new ExecutionsService(db);
+  const executions = new ExecutionsService(db, new (require('@nestjs/config').ConfigService)({ REFUND_BUDGETS_JSON: '[]' }));
   let effects = 0;
   const provider = { execute: async () => { effects++; throw new Error('must not dispatch'); } };
   const service = effect => new ActionsService(executions, provider, config,
@@ -59,7 +59,7 @@ test('policy snapshots survive replay, approvals are atomic, and legacy requests
     const failure = new Error('approval insert failed');
     const broken = new ExecutionsService({ execution: db.execution, $transaction: callback => db.$transaction(tx => callback({
       execution: tx.execution, approval: { create: async () => { throw failure; } },
-    })) });
+    })) }, new (require('@nestjs/config').ConfigService)({ REFUND_BUDGETS_JSON: '[]' }));
     await assert.rejects(broken.receive(request, 'rollback', () => ({ policyDecision: 'REQUIRE_APPROVAL', policyReason: 'MATCHED_APPROVAL', policyHash: 'a'.repeat(64), policyEvaluatedAt: new Date() })), e => e === failure);
     assert.equal(await db.execution.count({ where: { ...where, idempotencyKey: 'rollback' } }), 0);
     assert.equal(await db.executionAttempt.count({ where }), 0);
