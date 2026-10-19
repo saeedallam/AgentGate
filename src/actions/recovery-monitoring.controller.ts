@@ -1,3 +1,6 @@
+import { ApiInput, ApiErrors } from "../openapi/api-contract.js";
+import { z } from "zod";
+import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import {
   Body,
   Controller,
@@ -18,14 +21,20 @@ import { PrismaService } from "../infrastructure/database/prisma.service.js";
 import { ActionsService } from "./actions.service.js";
 
 // Read provider evidence even after the agent/key is disabled. No retry here.
+@ApiTags("actions")
 @Controller("v1/organizations/:organizationId/executions")
 @UseGuards(JwtAuthGuard)
+@ApiBearerAuth("userJwt")
 export class RecoveryMonitoringController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly actions: ActionsService,
   ) {}
 
+  @ApiErrors(
+    "OWNER reconciles an existing effect, including after agent suspension; never dispatches",
+  )
+  @ApiInput(z.strictObject({}), {})
   @Post(":id/reconcile")
   @HttpCode(200)
   @Header("Cache-Control", "no-store")

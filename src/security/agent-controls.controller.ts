@@ -1,3 +1,5 @@
+import { ApiInput, ApiErrors } from "../openapi/api-contract.js";
+import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import {
   BadRequestException,
   Body,
@@ -16,10 +18,14 @@ import type { AuthenticatedRequest } from "../auth/authenticated-request.js";
 import { PrismaService } from "../infrastructure/database/prisma.service.js";
 import { recordSecurityEvent } from "./security-audit.js";
 
+@ApiTags("security")
 @Controller("v1/organizations/:organizationId/agents/:agentId")
 @UseGuards(JwtAuthGuard)
+@ApiBearerAuth("userJwt")
 export class AgentControlsController {
   constructor(private readonly prisma: PrismaService) {}
+  @ApiErrors("OWNER activates or suspends an agent; claimed work may finish")
+  @ApiInput(z.strictObject({ status: z.enum(["ACTIVE", "SUSPENDED"]) }))
   @Post("status")
   async status(
     @Req() request: AuthenticatedRequest,
@@ -50,6 +56,8 @@ export class AgentControlsController {
       return agent;
     });
   }
+  @ApiErrors("OWNER revokes an agent credential")
+  @ApiInput(z.strictObject({}), {})
   @Post("credentials/:credentialId/revoke")
   async revoke(
     @Req() request: AuthenticatedRequest,

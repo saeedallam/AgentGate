@@ -1,3 +1,5 @@
+import { ApiInput, ApiErrors } from "../openapi/api-contract.js";
+import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import {
   BadRequestException,
   Body,
@@ -9,42 +11,38 @@ import {
   Req,
   UnauthorizedException,
   UseGuards,
-} from '@nestjs/common';
+} from "@nestjs/common";
 
-import type { AuthenticatedRequest } from '../auth/authenticated-request.js';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard.js';
-import { createOrganizationSchema } from './dto/create-organization.dto.js';
-import { OrganizationsService } from './organizations.service.js';
+import type { AuthenticatedRequest } from "../auth/authenticated-request.js";
+import { JwtAuthGuard } from "../auth/jwt-auth.guard.js";
+import { createOrganizationSchema } from "./dto/create-organization.dto.js";
+import { OrganizationsService } from "./organizations.service.js";
 
-@Controller('organizations')
+@ApiTags("organizations")
+@Controller("organizations")
 @UseGuards(JwtAuthGuard)
+@ApiBearerAuth("userJwt")
 export class OrganizationsController {
-  constructor(
-    private readonly organizations: OrganizationsService,
-  ) {}
+  constructor(private readonly organizations: OrganizationsService) {}
 
+  @ApiErrors("Create an organization with the authenticated user as OWNER")
+  @ApiInput(createOrganizationSchema, { name: "Demo workspace" })
   @Post()
-  create(
-    @Req() request: AuthenticatedRequest,
-    @Body() body: unknown,
-  ) {
+  create(@Req() request: AuthenticatedRequest, @Body() body: unknown) {
     const userId = this.getUserId(request);
     const result = createOrganizationSchema.safeParse(body);
 
     if (!result.success) {
-      throw new BadRequestException('Invalid organization data');
+      throw new BadRequestException("Invalid organization data");
     }
 
-    return this.organizations.createForUser(
-      userId,
-      result.data.name,
-    );
+    return this.organizations.createForUser(userId, result.data.name);
   }
 
-  @Get(':id')
+  @Get(":id")
   get(
     @Req() request: AuthenticatedRequest,
-    @Param('id', new ParseUUIDPipe({ version: '4' }))
+    @Param("id", new ParseUUIDPipe({ version: "4" }))
     organizationId: string,
   ) {
     return this.organizations.getForUser(
@@ -55,7 +53,7 @@ export class OrganizationsController {
 
   private getUserId(request: AuthenticatedRequest): string {
     if (!request.user) {
-      throw new UnauthorizedException('Authentication required');
+      throw new UnauthorizedException("Authentication required");
     }
 
     return request.user.id;

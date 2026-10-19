@@ -12,11 +12,11 @@ import { PrismaService } from "../infrastructure/database/prisma.service.js";
 import { verifiedActionRequest } from "../executions/verified-action-request.js";
 import { transitionApproval } from "./approval-state.js";
 
-const decisionSchema = z.strictObject({
+export const decisionSchema = z.strictObject({
   decision: z.enum(["APPROVED", "REJECTED"]),
 });
 
-const listSchema = z.strictObject({
+export const listSchema = z.strictObject({
   organizationId: z.uuid(),
   limit: z
     .string()

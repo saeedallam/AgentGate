@@ -219,3 +219,16 @@ also pass after the expiration display and singleton checks. Embedded execution 
 not evidence of independent native PostgreSQL races. The release workflow includes
 all existing native concurrency tests plus rate-slot and disablement/claim tests.
 See `docs/operational-hardening.md` for upgrade behavior and remaining boundaries.
+
+## OpenAPI / Swagger (2026-10-19)
+
+- Added local `/docs` UI and `/openapi.json`, development default with an explicit
+  enable/disable setting. Test/production default is off.
+- Local TypeScript build, 110 ordinary tests, ESLint and full npm audit passed
+  (zero reported vulnerabilities after a scoped js-yaml patch override).
+- Documentation tests exercise real Fastify routing, local Swagger assets,
+  enabled/disabled modes, strict Zod-derived request contracts, separate JWT/agent
+  security schemes and unchanged 401 guard rejection. No database migration or
+  runtime action authorization changes are introduced.
+- Native database/race verification is handled by the existing CI workflow;
+  ordinary tests alone do not establish database concurrency guarantees.

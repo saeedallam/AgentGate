@@ -1,3 +1,4 @@
+import { ApiExcludeController } from "@nestjs/swagger";
 import {
   Controller,
   Get,
@@ -41,6 +42,7 @@ for (const name of [
   manifest[`pages/${name}.mjs`] = "text/javascript; charset=utf-8";
 }
 
+@ApiExcludeController()
 @Controller()
 export class ConsoleAssetsController {
   // Loaded once per application instance, not as an import side effect or per request.

@@ -83,3 +83,11 @@ start the normal development application from that test-configured window.
 
 `.gitattributes` specifies LF for source/configuration and CRLF for Windows command
 scripts. No bulk renormalization or deletion of existing local changes is needed.
+
+### Swagger documentation (2026-10-19)
+
+`@nestjs/swagger` 11.4.7 and `@fastify/static` 10.1.6 satisfy the installed Nest 11
+platform's peer requirements. A parent-scoped `@nestjs/swagger -> js-yaml: 5.4.1`
+override replaces its vulnerable pinned 5.4.0 dependency (GHSA-r3ph-w7gj-g6xm).
+Review/remove this override when a compatible Swagger release includes the patch.
+No Nest major upgrade or force-audit fix is used.

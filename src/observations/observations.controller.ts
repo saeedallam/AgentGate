@@ -1,3 +1,7 @@
+import { ApiInput, ApiQueryInput, ApiErrors } from "../openapi/api-contract.js";
+import { simulationSchema, listSchema } from "./observations.service.js";
+import { refundSubmissionSchema } from "../openapi/refund-submission.js";
+import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import { ActionRateGuard } from "../security/action-rate.guard.js";
 import {
   Body,
@@ -19,10 +23,14 @@ import type { AgentAuthenticatedRequest } from "../agent-credentials/agent-authe
 import type { AuthenticatedRequest } from "../auth/authenticated-request.js";
 import { ObservationsService } from "./observations.service.js";
 
+@ApiTags("observations")
 @Controller("v1/actions")
 @UseGuards(AgentAuthGuard, ActionRateGuard)
+@ApiBearerAuth("agentApiKey")
 export class ActionObservationsController {
   constructor(private readonly observations: ObservationsService) {}
+  @ApiErrors("Observe a policy decision without executing an action")
+  @ApiInput(refundSubmissionSchema)
   @Post("observe")
   @HttpCode(200)
   @Header("Cache-Control", "no-store")
@@ -33,10 +41,14 @@ export class ActionObservationsController {
   }
 }
 
+@ApiTags("observations")
 @Controller("v1/organizations/:organizationId")
 @UseGuards(JwtAuthGuard)
+@ApiBearerAuth("userJwt")
 export class PolicyStudiesController {
   constructor(private readonly observations: ObservationsService) {}
+  @ApiErrors("OWNER simulates candidate rules against bounded stored history")
+  @ApiInput(simulationSchema)
   @Post("policy-simulations")
   @HttpCode(200)
   @Header("Cache-Control", "no-store")
@@ -49,6 +61,7 @@ export class PolicyStudiesController {
       throw new UnauthorizedException("Authentication required");
     return this.observations.simulate(request.user.id, org, input);
   }
+  @ApiQueryInput(listSchema)
   @Get("policy-observations")
   @Header("Cache-Control", "no-store")
   list(

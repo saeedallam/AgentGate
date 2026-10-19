@@ -24,7 +24,7 @@ import { verifiedActionRequest } from "../executions/verified-action-request.js"
 import { studyPolicyHash, summarizeDecisions } from "./policy-study.js";
 import type { Prisma } from "../generated/prisma/client.js";
 
-const simulationSchema = z.strictObject({
+export const simulationSchema = z.strictObject({
   executionIds: z
     .array(z.uuid())
     .min(1)
@@ -32,7 +32,7 @@ const simulationSchema = z.strictObject({
     .refine((ids) => new Set(ids).size === ids.length),
   policies: z.array(policySchema.omit({ organizationId: true })).max(100),
 });
-const listSchema = z.strictObject({
+export const listSchema = z.strictObject({
   limit: z
     .string()
     .regex(/^\d+$/)

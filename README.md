@@ -236,3 +236,11 @@ AgentGate is licensed under **[MIT](LICENSE)**. Copyright © 2026 Saeed Allam. D
 See [Operational hardening](docs/operational-hardening.md) for suspension/revocation,
 shared action limits, 24-hour first-dispatch deadlines, sensitive-read audit,
 next-day budget changes and the host-owned MCP operation UUID upgrade.
+
+## Interactive API reference
+
+Open **[Swagger UI](http://127.0.0.1:3000/docs)** while running in development.
+The **[OpenAPI JSON](http://127.0.0.1:3000/openapi.json)** can be imported into Postman.
+User JWT and agent API key authorization are documented separately; existing guards
+and policy checks still apply. Set `API_DOCS_ENABLED=false` to disable documentation;
+it is disabled by default in production. See [the Swagger guide](docs/openapi.md).

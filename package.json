@@ -20,12 +20,14 @@
   "license": "MIT",
   "type": "commonjs",
   "dependencies": {
+    "@fastify/static": "10.1.6",
     "@modelcontextprotocol/sdk": "1.32.1",
     "@nestjs/common": "11.2.5",
     "@nestjs/config": "^4.0.4",
     "@nestjs/core": "11.2.5",
     "@nestjs/jwt": "11.0.2",
     "@nestjs/platform-fastify": "11.2.5",
+    "@nestjs/swagger": "11.4.7",
     "@nestjs/throttler": "6.7.1",
     "@prisma/adapter-pg": "7.10.0",
     "@prisma/client": "7.10.0",
@@ -66,6 +68,9 @@
     },
     "prisma": {
       "mysql2": "3.24.6"
+    },
+    "@nestjs/swagger": {
+      "js-yaml": "5.4.1"
     }
   }
 }

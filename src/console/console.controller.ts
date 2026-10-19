@@ -1,3 +1,6 @@
+import { ApiQueryInput } from "../openapi/api-contract.js";
+import { pageSchema } from "./console.service.js";
+import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import {
   Controller,
   Get,
@@ -15,8 +18,10 @@ import { ConsoleService } from "./console.service.js";
 import { AgentAuthGuard } from "../agent-credentials/agent-auth.guard.js";
 import type { AgentAuthenticatedRequest } from "../agent-credentials/agent-authenticated-request.js";
 
+@ApiTags("console")
 @Controller("v1/console")
 @UseGuards(JwtAuthGuard)
+@ApiBearerAuth("userJwt")
 export class ConsoleController {
   constructor(private readonly consoleService: ConsoleService) {}
   private actor(request: AuthenticatedRequest) {
@@ -40,6 +45,7 @@ export class ConsoleController {
     return this.consoleService.overview(this.actor(request), id);
   }
 
+  @ApiQueryInput(pageSchema)
   @Get(":organizationId/executions")
   @Header("Cache-Control", "no-store")
   executions(
@@ -61,8 +67,10 @@ export class ConsoleController {
   }
 }
 
+@ApiTags("console")
 @Controller("v1/console-agent")
 @UseGuards(AgentAuthGuard)
+@ApiBearerAuth("agentApiKey")
 export class ConsoleAgentController {
   @Get("identity")
   @Header("Cache-Control", "no-store")

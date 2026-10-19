@@ -1,3 +1,5 @@
+import { ApiQueryInput } from "../openapi/api-contract.js";
+import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import { ConfigService } from "@nestjs/config";
 import { parseRefundBudgets } from "./refund-budget-config.js";
 import {
@@ -26,14 +28,17 @@ const querySchema = z.strictObject({
   day: z.iso.date().optional(),
 });
 
+@ApiTags("budgets")
 @Controller("v1/organizations/:organizationId/refund-budgets")
 @UseGuards(JwtAuthGuard)
+@ApiBearerAuth("userJwt")
 export class RefundBudgetsController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
   ) {}
 
+  @ApiQueryInput(querySchema)
   @Get()
   @Header("Cache-Control", "no-store")
   async read(

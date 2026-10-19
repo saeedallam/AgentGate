@@ -9,7 +9,7 @@ import { z } from "zod";
 import type { Prisma } from "../generated/prisma/client.js";
 import { PrismaService } from "../infrastructure/database/prisma.service.js";
 
-const pageSchema = z.strictObject({
+export const pageSchema = z.strictObject({
   cursor: z.uuid().optional(),
   status: z
     .enum([

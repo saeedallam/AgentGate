@@ -1,6 +1,6 @@
-import { z } from 'zod';
+import { z } from "zod";
 
-const refundArgumentsSchema = z.strictObject({
+export const refundArgumentsSchema = z.strictObject({
   paymentId: z
     .string()
     .min(1)
@@ -9,7 +9,7 @@ const refundArgumentsSchema = z.strictObject({
 
   amountMinor: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
 
-  currency: z.literal('USD'),
+  currency: z.literal("USD"),
 });
 
 export function parseRefundCreateArguments(input: unknown) {
