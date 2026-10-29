@@ -1,4 +1,4 @@
-FROM node:24.19.0-bookworm-slim AS build
+FROM node:26.12.0-bookworm-slim AS build
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
@@ -6,7 +6,7 @@ COPY . .
 RUN DATABASE_URL=postgresql://build:build@localhost:5432/build npm run prisma:generate && npm run build
 RUN npm prune --omit=dev
 
-FROM node:24.19.0-bookworm-slim AS runtime
+FROM node:26.12.0-bookworm-slim AS runtime
 ENV NODE_ENV=production HOST=0.0.0.0
 WORKDIR /app
 COPY --from=build --chown=node:node /app/node_modules ./node_modules
